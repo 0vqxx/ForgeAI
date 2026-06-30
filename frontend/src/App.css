@@ -1,0 +1,5 @@
+/* App-level styles — most styles live in index.css */
+.App {
+    height: 100vh;
+    width: 100vw;
+}
