@@ -18,24 +18,24 @@ NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
 # Supported models (user-facing)
 MODELS = [
     {
-        "id": "zai-org/glm-4.5",
-        "label": "GLM 4.5",
-        "description": "Zhipu AI · general-purpose",
+        "id": "z-ai/glm-5.1",
+        "label": "GLM 5.1",
+        "description": "Z.AI · flagship general model",
     },
     {
-        "id": "moonshotai/kimi-k2-instruct",
-        "label": "Kimi K2",
-        "description": "Moonshot AI · long context",
+        "id": "moonshotai/kimi-k2.6",
+        "label": "Kimi K2.6",
+        "description": "Moonshot · long context, strong agent",
     },
     {
-        "id": "ai21labs/jamba-1.5-large-instruct",
-        "label": "Jamba 1.5 Large",
-        "description": "AI21 · hybrid architecture",
+        "id": "minimaxai/minimax-m3",
+        "label": "MiniMax M3",
+        "description": "MiniMax · fast, instruction-following",
     },
     {
-        "id": "mistralai/mistral-medium-3-instruct",
-        "label": "Mistral Medium 3",
-        "description": "Mistral · balanced & fast",
+        "id": "mistralai/mistral-medium-3.5-128b",
+        "label": "Mistral Medium 3.5 128B",
+        "description": "Mistral · balanced & precise",
     },
     {
         "id": "meta/llama-3.3-70b-instruct",

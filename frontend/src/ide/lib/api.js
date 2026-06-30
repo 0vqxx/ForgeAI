@@ -48,7 +48,7 @@ export async function streamChat({ model, messages, system, signal, onDelta, onE
     const res = await fetch(`${API}/ai/chat/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages, system, temperature: 0.4, max_tokens: 2048 }),
+      body: JSON.stringify({ model, messages, system, temperature: 0.2, max_tokens: 3000 }),
       signal,
     });
     if (!res.ok || !res.body) {

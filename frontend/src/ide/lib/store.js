@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS = {
   fontSize: 13,
   tabSize: 2,
   wordWrap: "on",
-  model: "meta/llama-3.3-70b-instruct",
+  model: "z-ai/glm-5.1",
   autoSave: true,
   ghostText: true,
   terminalShell: "/bin/bash",

@@ -1,0 +1,36 @@
+{
+  "summary": "Tested Forge IDE agent-mode write flow with GLM 5.1 default. Model select correctly shows GLM 5.1, agent toggle shows orange 'Agent' badge, terminal prompt OK. However the core flow FAILED: after sending 'Create a file named hello.txt with the text Hi there', the assistant replied with a generic clarification message ('I'm ready to help! What would you like me to create or modify?') instead of emitting a <forge-file> block. GET /api/fs/read?path=hello.txt returned 404 — file was NOT created. Also, explorer does not show tree-example.py (shows example.py, test_t1.txt, upload_t1.txt, upreg.txt, welcome.md, t1folder_renamed/ only).",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "App loads at REACT_APP_BACKEND_URL",
+    "localStorage cleared & reload OK",
+    "Model select shows current value z-ai/glm-5.1 (GLM 5.1) — default applied",
+    "Agent mode badge visible (orange 'Agent' pill in header)",
+    "chat-input accepts text; chat-send-btn sends message",
+    "Assistant streams a reply within 60s",
+    "Terminal shows 'forge workspace $' prompt"
+  ],
+  "failed": [
+    {
+      "area": "agent-mode write flow (core)",
+      "issue": "GLM 5.1 did NOT emit a <forge-file> block. It responded with a generic clarification: 'I\u2019m ready to help! What would you like me to create or modify?' — same class of regression as iterations 1-4 (Llama refusing). The direct-curl verification mentioned in the task does NOT reproduce through the in-app chat path.",
+      "evidence": "Chat reply visible in screenshot; GET /api/fs/read?path=hello.txt -> 404 {\"detail\":\"File not found\"}; DELETE pre-step also returned 404 (file never existed). Prompt sent exactly: 'Create a file named hello.txt with the text Hi there'.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "explorer spot-check",
+      "issue": "tree-example.py is NOT present in the explorer (0 occurrences in DOM). Explorer lists: t1folder_renamed/, example.py, test_t1.txt, upload_t1.txt, upreg.txt, welcome.md.",
+      "evidence": "Playwright count for text 'tree-example.py' = 0; screenshot of EXPLORER panel.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Investigate why GLM 5.1 in-app does NOT emit <forge-file> block while the direct curl test does. Likely the agent system prompt / message construction in /app/backend/routes/ai.py or the ChatPanel agent-reminder prefix is not being applied for the first-turn user message, or is being stripped. Compare the exact request body the frontend sends vs. the curl that worked.",
+    "Confirm whether the assistant's clarification reply ('I\u2019m ready to help...') is a hard-coded greeting from the frontend or actually returned by the model — if frontend-injected, the user message may not be reaching the model. Inspect ChatPanel.jsx send path and backend stream handler.",
+    "Optionally: re-prompt with a stronger system message demanding the <forge-file> block, or fall back to a different model (Kimi K2.6 / MiniMax M3) and re-verify.",
+    "If tree-example.py was expected, seed the workspace with it; otherwise update the test expectation."
+  ],
+  "success_rate": {"backend": "n/a (frontend-only requested)", "frontend": "60%"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}

@@ -126,7 +126,7 @@ export default function ChatPanel({ getContext, onMaximize, onFilesChanged }) {
       finalUser = `Currently open file: ${ctx.path} (${ctx.language})\n\n\`\`\`${ctx.language}\n${ctx.code.slice(0, 8000)}\n\`\`\`\n\nUser: ${userMsg}`;
     }
     if (agentMode) {
-      finalUser = `${finalUser}\n\n[Agent reminder: If this request implies any file creation or modification, you MUST respond immediately with one or more <forge-file path="..." action="create|update">\`\`\`lang\n...\n\`\`\`</forge-file> blocks. Do NOT ask for clarification. Choose a sensible filename if none is given.]`;
+      finalUser = `[AGENT TASK — respond ONLY with <forge-file path="..." action="create|update">\`\`\`lang\n...code...\n\`\`\`</forge-file> blocks. Do NOT ask for clarification. Choose a filename if none is given.]\n\n${finalUser}`;
     }
     chats.appendMessage(convId, { role: "user", content: userMsg, ts: Date.now() });
     chats.appendMessage(convId, { role: "assistant", content: "", ts: Date.now() });
