@@ -1,11 +1,10 @@
-"""WebSocket-backed PTY terminal."""
+"""WebSocket-backed PTY terminal (event-driven, no busy polling)."""
 from __future__ import annotations
 
 import asyncio
 import fcntl
 import os
 import pty
-import select
 import signal
 import struct
 import termios
@@ -22,16 +21,15 @@ async def terminal_ws(ws: WebSocket):
     await ws.accept()
     pid, fd = pty.fork()
     if pid == 0:
-        # Child: exec bash inside workspace
         os.chdir(WORKSPACE_DIR)
         env = os.environ.copy()
         env["TERM"] = "xterm-256color"
-        env["PS1"] = "\\[\\e[38;5;79m\\]bloom\\[\\e[0m\\] \\W $ "
+        env["PS1"] = "\\[\\e[38;5;208m\\]forge\\[\\e[0m\\] \\W $ "
         os.execvpe("/bin/bash", ["/bin/bash", "--norc", "-i"], env)
-        # unreachable
         return
 
     loop = asyncio.get_event_loop()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
 
     def _set_winsize(rows: int, cols: int):
         try:
@@ -41,30 +39,44 @@ async def terminal_ws(ws: WebSocket):
 
     _set_winsize(30, 100)
 
-    async def read_pty():
-        try:
-            while True:
-                await loop.run_in_executor(None, lambda: select.select([fd], [], [], 0.05))
-                try:
-                    data = os.read(fd, 4096)
-                except OSError:
-                    break
-                if not data:
-                    break
-                try:
-                    await ws.send_text(data.decode(errors="replace"))
-                except Exception:
-                    break
-        except Exception:
-            pass
+    # Make pty non-blocking so we can read in the event-loop callback
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-    reader_task = asyncio.create_task(read_pty())
+    def _on_readable():
+        try:
+            data = os.read(fd, 4096)
+            if data:
+                queue.put_nowait(data)
+            else:
+                queue.put_nowait(None)
+        except BlockingIOError:
+            return
+        except OSError:
+            queue.put_nowait(None)
+
+    loop.add_reader(fd, _on_readable)
+
+    async def _sender():
+        while True:
+            data = await queue.get()
+            if data is None:
+                return
+            try:
+                await ws.send_text(data.decode(errors="replace"))
+            except Exception:
+                return
+
+    sender_task = asyncio.create_task(_sender())
     try:
         while True:
             msg = await ws.receive_json()
             kind = msg.get("type")
             if kind == "input":
-                os.write(fd, msg.get("data", "").encode())
+                try:
+                    os.write(fd, msg.get("data", "").encode())
+                except OSError:
+                    break
             elif kind == "resize":
                 _set_winsize(int(msg.get("rows", 30)), int(msg.get("cols", 100)))
     except WebSocketDisconnect:
@@ -72,7 +84,15 @@ async def terminal_ws(ws: WebSocket):
     except Exception:
         pass
     finally:
-        reader_task.cancel()
+        try:
+            loop.remove_reader(fd)
+        except Exception:
+            pass
+        queue.put_nowait(None)
+        try:
+            await asyncio.wait_for(sender_task, timeout=1.0)
+        except Exception:
+            sender_task.cancel()
         try:
             os.kill(pid, signal.SIGHUP)
         except ProcessLookupError:
