@@ -125,6 +125,9 @@ export default function ChatPanel({ getContext, onMaximize, onFilesChanged }) {
     if (ctx?.code) {
       finalUser = `Currently open file: ${ctx.path} (${ctx.language})\n\n\`\`\`${ctx.language}\n${ctx.code.slice(0, 8000)}\n\`\`\`\n\nUser: ${userMsg}`;
     }
+    if (agentMode) {
+      finalUser = `${finalUser}\n\n[Agent reminder: If this request implies any file creation or modification, you MUST respond immediately with one or more <forge-file path="..." action="create|update">\`\`\`lang\n...\n\`\`\`</forge-file> blocks. Do NOT ask for clarification. Choose a sensible filename if none is given.]`;
+    }
     chats.appendMessage(convId, { role: "user", content: userMsg, ts: Date.now() });
     chats.appendMessage(convId, { role: "assistant", content: "", ts: Date.now() });
     if (active && active.messages.length === 0) {
@@ -158,7 +161,10 @@ export default function ChatPanel({ getContext, onMaximize, onFilesChanged }) {
     while ((m = regex.exec(text)) !== null) {
       actions.push({ path: m[1], action: m[2], content: m[3] });
     }
-    if (actions.length === 0) return;
+    if (actions.length === 0) {
+      toast("No file actions in reply", { description: "Try a more specific request like 'create file X with Y'" });
+      return;
+    }
     for (const a of actions) {
       try {
         await fsApi.write(a.path, a.content);
