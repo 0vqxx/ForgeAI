@@ -1,0 +1,31 @@
+{
+  "summary": "Verified agent-mode write flow end-to-end. Bug still reproduces: the claimed fix (useChatHistory.getState()) is NOT present in ChatPanel.jsx — grep for 'getState' returns zero matches. POST to /api/ai/chat/stream sends messages:[] with no '[AGENT TASK' prefix, and hello.txt is never created.",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "App loads after localStorage clear",
+    "Model select correctly shows 'GLM 5.1' (id z-ai/glm-5.1)",
+    "chat-input accepts the exact prompt and chat-send-btn triggers POST /api/ai/chat/stream",
+    "Pre-existing hello.txt cleanup (DELETE returned 404 as expected)"
+  ],
+  "failed": [
+    {
+      "area": "ChatPanel.jsx agent-mode closure bug (UNFIXED)",
+      "issue": "Stale Zustand closure still in place. Line 139 still reads `chats.conversations.find(...)` from React render-time snapshot instead of `useChatHistory.getState().conversations`. As a result, after appendMessage, the snapshot `conv?.messages` is still empty, history=[], and `history[history.length-1] = {role:'user', content: finalUser}` assigns to index -1 on an empty array (a non-array property), so the request body ends up with `messages: []` and the agent-prefixed finalUser never reaches the backend.",
+      "evidence": "Captured POST body: {\"model\":\"z-ai/glm-5.1\",\"messages\":[],\"system\":\"You are Forge — ...\"}. contains_AGENT_TASK=False. Assistant replied 'I'm ready to help! What would you like me to create or modify?' (no <forge-file> block). GET /api/fs/read?path=hello.txt returned 404 for the full 60s window. grep -n 'getState' /app/frontend/src/ide/components/ChatPanel.jsx /app/frontend/src/ide/lib/store.js → no matches.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "/api/ai/chat/stream with empty messages",
+      "issue": "Backend accepts messages:[] and returns a generic greeting instead of erroring. Not the root cause, but worth noting — empty messages array should probably be rejected with 400.",
+      "evidence": "Single successful 200 stream returned 'I'm ready to help...' for a request with no user message.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Actually apply the documented fix in /app/frontend/src/ide/components/ChatPanel.jsx send(): replace `const conv = chats.conversations.find((c) => c.id === convId);` with `const conv = useChatHistory.getState().conversations.find((c) => c.id === convId);` so that the just-appended user message is included in `history` before `history[history.length - 1] = { role: 'user', content: finalUser }` overwrites it with the agent-prefixed version.",
+    "Also guard against the index-(-1) write: after building history, if it's empty, push the finalUser message instead of indexing -1."
+  ],
+  "success_rate": {"backend": "n/a (frontend-only run)", "frontend": "25% (model+input OK; agent write flow broken)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}
