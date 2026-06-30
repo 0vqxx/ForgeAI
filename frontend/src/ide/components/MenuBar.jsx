@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 const MENUS = (cmd) => ({
   File: [
+    { label: "Open Folder…", shortcut: "Ctrl+Shift+O", run: () => { if (window.forge?.isElectron) window.forge.openFolder(); else alert("Open Folder works in the Electron desktop build."); } },
     { label: "New File", shortcut: "Ctrl+N", run: () => cmd.run("new-file") },
     { label: "New Folder", shortcut: "Ctrl+Alt+A", run: () => cmd.run("new-folder") },
     { kind: "sep" },

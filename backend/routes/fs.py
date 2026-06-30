@@ -53,6 +53,27 @@ class SearchRequest(BaseModel):
     max_results: int = 200
 
 
+class CopyRequest(BaseModel):
+    src: str
+    dst: str
+
+
+@router.post("/copy")
+async def copy_node(req: CopyRequest):
+    s = _safe_path(req.src)
+    d = _safe_path(req.dst)
+    if not s.exists():
+        raise HTTPException(404, "Source not found")
+    if d.exists():
+        raise HTTPException(409, "Target exists")
+    d.parent.mkdir(parents=True, exist_ok=True)
+    if s.is_dir():
+        shutil.copytree(s, d)
+    else:
+        shutil.copy2(s, d)
+    return {"ok": True, "path": _rel(d)}
+
+
 @router.post("/upload")
 async def upload(file: UploadFile = File(...), dest: str = Form("")):
     """Upload a file (drag-and-drop import). `dest` is the target directory relative to workspace root."""

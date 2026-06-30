@@ -12,6 +12,39 @@ export default function FileExplorer({ onOpenFile }) {
   const [renamePath, setRenamePath] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [ctx, setCtx] = useState(null); // { x, y, node }
+  const [clipboard, setClipboard] = useState(null); // { path, cut }
+
+  useEffect(() => {
+    const close = () => setCtx(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
+
+  const uniqueCopyPath = (p) => {
+    const dot = p.lastIndexOf(".");
+    const base = dot > 0 ? p.slice(0, dot) : p;
+    const ext = dot > 0 ? p.slice(dot) : "";
+    return `${base}_copy${ext}`;
+  };
+
+  const onCtxDelete = async (n) => { await fsApi.remove(n.path); toast.success("Deleted"); refreshPath(""); };
+  const onCtxDuplicate = async (n) => { await fsApi.copy(n.path, uniqueCopyPath(n.path)); toast.success("Duplicated"); refreshPath(""); };
+  const onCtxCopy = (n) => { setClipboard({ path: n.path, cut: false }); toast(`Copied ${n.name}`); };
+  const onCtxCut = (n) => { setClipboard({ path: n.path, cut: true }); toast(`Cut ${n.name}`); };
+  const onCtxPaste = async () => {
+    if (!clipboard) return;
+    const name = clipboard.path.split("/").pop();
+    let dst = name;
+    try { await fsApi.tree(dst); dst = uniqueCopyPath(name); } catch {}
+    try {
+      if (clipboard.cut) await fsApi.rename(clipboard.path, dst);
+      else await fsApi.copy(clipboard.path, dst);
+      toast.success("Pasted");
+      setClipboard(clipboard.cut ? null : clipboard);
+      refreshPath("");
+    } catch (e) { toast.error("Paste failed"); }
+  };
 
   const refreshPath = useCallback(async (path) => {
     const data = await fsApi.tree(path);
@@ -144,6 +177,7 @@ export default function FileExplorer({ onOpenFile }) {
               className={`bl-tree-row ${selected === node.path ? "selected" : ""}`}
               style={{ paddingLeft: 8 + node.depth * 12 }}
               onClick={() => onRowClick(node)}
+              onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, node }); }}
               data-testid={`tree-${node.path}`}
             >
               {node.is_dir ? (
@@ -188,6 +222,22 @@ export default function FileExplorer({ onOpenFile }) {
           </div>
         )}
       </div>
+      {ctx && (
+        <div data-testid="ctx-menu" style={{ position: "fixed", top: ctx.y, left: ctx.x, zIndex: 200, background: "var(--bg-elev)", border: "1px solid var(--border-strong)", borderRadius: 8, padding: 4, minWidth: 180, boxShadow: "0 12px 32px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()}>
+          {[
+            { label: "Open", run: () => { onRowClick(ctx.node); setCtx(null); }, hide: ctx.node.is_dir },
+            { label: "Rename", run: () => { startRename({ stopPropagation: () => {} }, ctx.node); setCtx(null); } },
+            { label: "Duplicate", run: () => { onCtxDuplicate(ctx.node); setCtx(null); } },
+            { label: "Copy", run: () => { onCtxCopy(ctx.node); setCtx(null); } },
+            { label: "Cut", run: () => { onCtxCut(ctx.node); setCtx(null); } },
+            { label: "Paste", run: () => { onCtxPaste(); setCtx(null); }, disabled: !clipboard },
+            { kind: "sep" },
+            { label: "Delete", run: () => { onCtxDelete(ctx.node); setCtx(null); }, danger: true },
+          ].filter(i => !i.hide).map((it, i) => it.kind === "sep" ? <div key={i} style={{ height: 1, background: "var(--border)", margin: "4px 0" }} /> : (
+            <button key={i} disabled={it.disabled} onClick={it.run} style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 10px", fontSize: 12, color: it.danger ? "var(--danger)" : "var(--fg)", background: "transparent", border: 0, borderRadius: 6, cursor: it.disabled ? "not-allowed" : "pointer", opacity: it.disabled ? 0.4 : 1 }} onMouseEnter={(e) => !it.disabled && (e.currentTarget.style.background = "var(--accent-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>{it.label}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,9 @@
 /** Backend API client + helpers. */
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+const BACKEND_URL = (typeof window !== "undefined" && window.forge?.isElectron)
+  ? window.forge.backendUrl()
+  : (process.env.REACT_APP_BACKEND_URL || "");
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API });
@@ -13,6 +15,7 @@ export const fsApi = {
   create: (path, is_dir = false) => api.post("/fs/create", { path, is_dir }).then((r) => r.data),
   rename: (path, new_path) => api.post("/fs/rename", { path, new_path }).then((r) => r.data),
   remove: (path) => api.delete("/fs/delete", { params: { path } }).then((r) => r.data),
+  copy: (src, dst) => api.post("/fs/copy", { src, dst }).then((r) => r.data),
   search: (query) => api.post("/fs/search", { query }).then((r) => r.data),
   upload: (file, dest = "") => {
     const fd = new FormData();
