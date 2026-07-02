@@ -66,7 +66,12 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin + "/dashboard" },
+        // Redirect to a dedicated callback route for Google OAuth.
+        // Ensure this URL is added to Supabase allowed redirect URLs.
+        options: { 
+          redirectTo: import.meta.env.VITE_GOOGLE_REDIRECT_URI || 
+                    `${window.location.origin}/api/auth/callback/google` 
+        },
       });
       if (error) toast.error(error.message);
     } finally {
@@ -79,7 +84,12 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "discord",
-        options: { redirectTo: window.location.origin + "/dashboard" },
+        // Redirect to a dedicated callback route for Discord OAuth.
+        // Ensure this URL is added to Supabase allowed redirect URLs.
+        options: { 
+          redirectTo: import.meta.env.VITE_DISCORD_REDIRECT_URI || 
+                    `${window.location.origin}/api/auth/callback/discord` 
+        },
       });
       if (error) toast.error(error.message);
     } finally {

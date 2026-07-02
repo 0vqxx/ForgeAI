@@ -56,14 +56,12 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
 
   async function loadChats() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      const res = await fetch("/api/conversations", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!res.ok) return;
-      const convos: ConversationRow[] = await res.json();
-      setRecentChats(convos.slice(0, 8));
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("id, title, created_at, updated_at, model")
+        .order("updated_at", { ascending: false });
+      if (error || !data) return;
+      setRecentChats(data.slice(0, 8) as ConversationRow[]);
     } catch {
       setRecentChats([]);
     }
@@ -118,16 +116,10 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
       return;
     }
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      await fetch(`/api/conversations/${renamingId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ title: renameValue.trim() }),
-      });
+      await supabase
+        .from("conversations")
+        .update({ title: renameValue.trim() })
+        .eq("id", renamingId);
       setRecentChats((prev) =>
         prev.map((c) => (c.id === renamingId ? { ...c, title: renameValue.trim() } : c))
       );
@@ -141,12 +133,7 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
     const prev = recentChats;
     setRecentChats((chats) => chats.filter((c) => c.id !== id));
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      await fetch(`/api/conversations/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      await supabase.from("conversations").delete().eq("id", id);
       if (pathname === `/chat/${id}`) {
         navigate({ to: "/chat" });
       }
@@ -163,7 +150,7 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
       {/* Sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-border/60 bg-sidebar/70 px-3 py-4 backdrop-blur-xl md:flex">
         <Link to="/" className="group mb-2 flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-sidebar-accent">
-          <ForgeLockup size={32} />
+          <ForgeLockup size={24} />
         </Link>
 
         <button
@@ -280,7 +267,7 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border/60 bg-background/60 px-5 backdrop-blur-xl">
           <div className="flex items-center gap-2 text-[13px] text-text-muted md:hidden">
-            <ForgeLockup size={28} />
+            <ForgeLockup size={22} />
           </div>
           <div className="ml-auto flex items-center gap-2">{topRight}</div>
         </header>

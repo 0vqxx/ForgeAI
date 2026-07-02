@@ -158,7 +158,7 @@ class OpenAIClient(AIProviderClient):
             stream=True,
         ) as response:
             for chunk in response:
-                if chunk.choices[0].delta.content:
+                if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
     def list_models(self) -> List[str]:
@@ -426,7 +426,7 @@ class NvidiaClient(AIProviderClient):
                     stream=True,
                 )
                 for chunk in response:
-                    if chunk.choices[0].delta.content:
+                    if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
                 return
             except Exception as e:

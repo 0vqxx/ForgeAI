@@ -304,6 +304,7 @@ function SettingsPage() {
             )}
           </dl>
         </div>
+
       </div>
     </AppShell>
   );

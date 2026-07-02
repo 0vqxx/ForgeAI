@@ -31,7 +31,7 @@ export function ModelSelector({
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 rounded-full border border-border bg-elevated/70 px-2.5 py-1 text-[11px] font-medium hover:bg-elevated transition-colors"
       >
-        <ProviderIcon provider={current.provider} size={12} />
+        <ProviderIcon provider={current.provider} model={model} size={12} />
         {current.label}
         <ChevronDown className="h-3 w-3 opacity-50" />
       </button>
@@ -62,7 +62,7 @@ export function ModelSelector({
                     } ${isGlm52 ? "relative font-semibold text-amber-500 hover:text-amber-400" : ""}`}
                     style={isGlm52 ? { textShadow: "0 0 8px rgba(245, 158, 11, 0.4)" } : undefined}
                   >
-                    <ProviderIcon provider={info.provider} size={14} />
+                    <ProviderIcon provider={info.provider} model={key} size={14} />
                     {info.label}
                     {isGlm52 && (
                       <span className="ml-auto text-[8px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 animate-pulse font-bold tracking-wider uppercase">

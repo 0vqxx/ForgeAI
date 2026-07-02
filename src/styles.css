@@ -336,12 +336,41 @@
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.08); }
 }
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
 
 @utility animate-forge-drift {
   animation: forge-drift 18s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 @utility animate-forge-pulse {
   animation: forge-pulse 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@utility animate-fade-in-up {
+  animation: fade-in-up 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@utility animate-fade-in {
+  animation: fade-in 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@utility animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
 @layer base {

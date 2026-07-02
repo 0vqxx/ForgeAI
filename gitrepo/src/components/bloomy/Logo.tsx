@@ -1,11 +1,11 @@
-export function ForgeMark({ size = 36, className = "" }: { size?: number; className?: string }) {
+export function ForgeMark({ size = 24, className = "" }: { size?: number; className?: string }) {
   return (
     <img
       src="/forgelogo.png"
       alt="Forge"
       width={size}
       height={size}
-      className={`select-none ${className}`}
+      className={`select-none invert dark:invert-0 ${className}`}
       style={{ width: size, height: size, objectFit: "contain" }}
       draggable={false}
     />
@@ -20,7 +20,7 @@ export function ForgeWordmark({ className = "" }: { className?: string }) {
   );
 }
 
-export function ForgeLockup({ size = 32 }: { size?: number }) {
+export function ForgeLockup({ size = 24 }: { size?: number }) {
   return (
     <div className="flex items-center gap-2.5">
       <ForgeMark size={size} />

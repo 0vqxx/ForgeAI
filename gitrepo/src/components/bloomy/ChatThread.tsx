@@ -14,8 +14,60 @@ interface ChatMessage {
   timestamp: string;
 }
 
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  const morning = [
+    { prefix: "What are we creating ", highlight: "this morning", suffix: "?" },
+    { prefix: "Ready to face ", highlight: "the day", suffix: "?" },
+    { prefix: "Need coffee, or will my ", highlight: "replies", suffix: " suffice?" },
+    { prefix: "Rise and shine. Or just stay in ", highlight: "dark mode", suffix: "." },
+    { prefix: "Did you dream of me, or was it just another ", highlight: "server restart", suffix: "?" },
+    { prefix: "Let's build something before the ", highlight: "meetings", suffix: " start." }
+  ];
+
+  const afternoon = [
+    { prefix: "How is your ", highlight: "afternoon", suffix: " going?" },
+    { prefix: "What should we focus on ", highlight: "this afternoon", suffix: "?" },
+    { prefix: "Ah, the afternoon slump. Let's do something ", highlight: "interesting", suffix: "." },
+    { prefix: "Are we building something cool, or just avoiding ", highlight: "chores", suffix: "?" },
+    { prefix: "Need a distraction from whatever you're ", highlight: "supposed to be doing", suffix: "?" },
+    { prefix: "What's the plan for ", highlight: "escaping reality", suffix: " today?" }
+  ];
+
+  const evening = [
+    { prefix: "Winding down, or winding up for a ", highlight: "side project", suffix: "?" },
+    { prefix: "What's on your mind ", highlight: "this evening", suffix: "?" },
+    { prefix: "Are we doing some serious work, or just ", highlight: "playing around", suffix: "?" },
+    { prefix: "Let's design something crazy. What could ", highlight: "go wrong", suffix: "?" },
+    { prefix: "What is the story we are writing ", highlight: "tonight", suffix: "?" }
+  ];
+
+  const night = [
+    { prefix: "Burning the ", highlight: "midnight oil", suffix: "?" },
+    { prefix: "Late night thoughts. What is keeping you ", highlight: "awake", suffix: "?" },
+    { prefix: "Go to sleep. Or let's keep talking, I don't ", highlight: "sleep", suffix: " anyway." },
+    { prefix: "It's late. Perfect time for some questionable ", highlight: "life decisions", suffix: "." },
+    { prefix: "Midnight ideas hit different. What are we ", highlight: "exploring", suffix: "?" }
+  ];
+
+  let list = morning;
+  if (hour >= 5 && hour < 12) {
+    list = morning;
+  } else if (hour >= 12 && hour < 17) {
+    list = afternoon;
+  } else if (hour >= 17 && hour < 22) {
+    list = evening;
+  } else {
+    list = night;
+  }
+
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 export function ChatThread({ id }: { id: string }) {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [greeting] = useState(() => getGreeting());
   const [title, setTitle] = useState("New chat");
   const [model, setModel] = useState<NvidiaModel>("moonshotai/kimi-k2.6");
   const [input, setInput] = useState("");
@@ -64,25 +116,38 @@ export function ChatThread({ id }: { id: string }) {
     let cancelled = false;
 
     async function load() {
-      const { data: convo } = await supabase
+      console.log("[ChatThread] Loading convo with ID:", id);
+      try {
+        const rawConvos = localStorage.getItem("mock_db_conversations");
+        console.log("[ChatThread] Raw convos in localStorage:", rawConvos);
+      } catch (err) {
+        console.error("[ChatThread] Error reading raw convos:", err);
+      }
+
+      const { data: convo, error: convoError } = await supabase
         .from("conversations")
         .select("id, title, model")
         .eq("id", id)
         .single();
 
+      console.log("[ChatThread] Loaded convo:", convo, "Error:", convoError);
+
       if (cancelled) return;
 
       if (convo) {
         isNew.current = false;
+        convoId.current = convo.id;
         titleRef.current = convo.title ?? "New chat";
         setTitle(convo.title ?? "New chat");
         if (convo.model) setModel(convo.model as NvidiaModel);
 
-        const { data: messages } = await supabase
+        const { data: messages, error: msgsError } = await supabase
           .from("messages")
           .select("id, role, content, created_at")
           .eq("conversation_id", id)
           .order("created_at", { ascending: true });
+
+        console.log("[ChatThread] Loaded messages:", messages, "Error:", msgsError);
 
         if (!cancelled && messages) {
           const loaded: ChatMessage[] = messages.map((m) => ({
@@ -269,7 +334,9 @@ export function ChatThread({ id }: { id: string }) {
             <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center">
               <div className="text-center">
                 <h1 className="font-display text-[44px] leading-[1.05] tracking-tight md:text-[56px]">
-                  How can I help, <span className="forge-gradient-text">today</span>?
+                  {greeting.prefix}
+                  <span className="forge-gradient-text">{greeting.highlight}</span>
+                  {greeting.suffix}
                 </h1>
                 <p className="mt-3 text-base text-text-muted">
                   Ask me anything — I'm here to help you think, build, and ship.
@@ -428,7 +495,7 @@ function Bubble({ role, children }: { role: "user" | "assistant" | "system"; chi
   return (
     <div className="flex items-start gap-3">
       <div className="elev-1 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-elevated">
-        <ForgeMark size={36} />
+        <ForgeMark size={20} />
       </div>
       <div className="max-w-2xl pt-1 text-sm leading-relaxed text-foreground">{renderMessage(content)}</div>
     </div>

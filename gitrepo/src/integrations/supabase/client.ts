@@ -43,6 +43,8 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
+  console.log('[Supabase] Initializing client with URL:', SUPABASE_URL);
+
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
@@ -65,4 +67,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-

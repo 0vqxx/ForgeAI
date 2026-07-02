@@ -21,7 +21,7 @@ function Landing() {
       <AmbientBackground />
 
       {/* Nav */}
-      <header className="sticky top-0 z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-5 md:px-10">
+      <header className="sticky top-0 z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-5 md:px-10 animate-fade-in">
         <ForgeLockup />
         <nav className="hidden items-center gap-7 text-sm text-text-muted md:flex">
           {["Product", "Pricing", "Docs"].map((l) => (
@@ -40,23 +40,35 @@ function Landing() {
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-6 pb-24 pt-12 md:px-10 md:pb-32 md:pt-20">
         <div className="mx-auto max-w-3xl text-center">
-          <span className="elev-1 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-elevated/80 px-3 py-1 text-[12px] font-medium text-text-muted">
+          <span 
+            className="elev-1 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-elevated/80 px-3 py-1 text-[12px] font-medium text-text-muted animate-fade-in-up"
+            style={{ animationDelay: "150ms", animationFillMode: "both" }}
+          >
             <Sparkles className="h-3 w-3 text-orange-500" />
             Forge 1.0 — now in private beta
           </span>
 
-          <h1 className="font-display mt-7 text-[44px] leading-[1.02] tracking-tight text-foreground sm:text-[64px] md:text-[88px]">
+          <h1 
+            className="font-display mt-7 text-[44px] leading-[1.02] tracking-tight text-foreground sm:text-[64px] md:text-[88px] animate-fade-in-up"
+            style={{ animationDelay: "300ms", animationFillMode: "both" }}
+          >
             Intelligence,
             <br />
             <span className="forge-gradient-text">forged.</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-text-muted sm:text-lg">
+          <p 
+            className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-text-muted sm:text-lg animate-fade-in-up"
+            style={{ animationDelay: "450ms", animationFillMode: "both" }}
+          >
             A quiet, considered AI workspace. Chat, agents, editor, and
             workspaces — held together by a single, premium surface.
           </p>
 
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <div 
+            className="mt-9 flex flex-wrap items-center justify-center gap-3 animate-fade-in-up"
+            style={{ animationDelay: "600ms", animationFillMode: "both" }}
+          >
             <Link to="/auth" className="elev-2 group inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:opacity-95 active:scale-[0.99]">
               Start chatting
               <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -69,33 +81,38 @@ function Landing() {
         </div>
 
         {/* Product preview */}
-        <div className="relative mx-auto mt-20 max-w-5xl">
-          <div className="absolute -inset-x-10 -top-10 bottom-0 -z-10 rounded-[40px] forge-gradient-bg opacity-25 blur-3xl" />
-          <div className="elev-3 overflow-hidden rounded-3xl border border-border/60 bg-elevated/80 backdrop-blur-xl">
-            <div className="flex items-center gap-1.5 border-b border-divider px-4 py-3">
-              <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.85_0.13_25)]/70" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.86_0.14_85)]/70" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.82_0.15_150)]/70" />
-              <div className="mx-auto flex items-center gap-2 text-[12px] text-text-muted">
-                <ForgeMark size={18} /> forge.ai / chat
+        <div 
+          className="relative mx-auto mt-20 max-w-5xl animate-fade-in-up"
+          style={{ animationDelay: "750ms", animationFillMode: "both" }}
+        >
+          <div className="animate-float">
+            <div className="absolute -inset-x-10 -top-10 bottom-0 -z-10 rounded-[40px] forge-gradient-bg opacity-25 blur-3xl animate-pulse" style={{ animationDuration: "8s" }} />
+            <div className="elev-3 overflow-hidden rounded-3xl border border-border/60 bg-elevated/80 backdrop-blur-xl">
+              <div className="flex items-center gap-1.5 border-b border-divider px-4 py-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.85_0.13_25)]/70" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.86_0.14_85)]/70" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.82_0.15_150)]/70" />
+                <div className="mx-auto flex items-center gap-2 text-[12px] text-text-muted">
+                  <ForgeMark size={18} /> forge.ai / chat
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-12 gap-0">
-              <div className="col-span-3 hidden border-r border-divider bg-sidebar/60 p-4 md:block">
-                {["New chat", "Marketing ideas", "Refactor planner", "Trip to Kyoto", "Q3 roadmap"].map((t, i) => (
-                  <div key={t} className={`mb-1 rounded-lg px-2.5 py-2 text-[12.5px] ${i === 1 ? "bg-sidebar-accent text-foreground" : "text-text-muted"}`}>{t}</div>
-                ))}
-              </div>
-              <div className="col-span-12 p-6 md:col-span-9 md:p-8">
-                <div className="space-y-5">
-                  <Bubble role="user">Draft a launch note for our spring release.</Bubble>
-                  <Bubble role="assistant">
-                    <span className="font-display text-[17px]">Spring, gently.</span>
-                    <br />
-                    We've quietly rebuilt Forge from the ground up. New
-                    agents, a calmer editor, and a chat that finally feels like
-                    yours…
-                  </Bubble>
+              <div className="grid grid-cols-12 gap-0">
+                <div className="col-span-3 hidden border-r border-divider bg-sidebar/60 p-4 md:block">
+                  {["New chat", "Marketing ideas", "Refactor planner", "Trip to Kyoto", "Q3 roadmap"].map((t, i) => (
+                    <div key={t} className={`mb-1 rounded-lg px-2.5 py-2 text-[12.5px] ${i === 1 ? "bg-sidebar-accent text-foreground" : "text-text-muted"}`}>{t}</div>
+                  ))}
+                </div>
+                <div className="col-span-12 p-6 md:col-span-9 md:p-8">
+                  <div className="space-y-5">
+                    <Bubble role="user">Draft a launch note for our spring release.</Bubble>
+                    <Bubble role="assistant">
+                      <span className="font-display text-[17px]">Spring, gently.</span>
+                      <br />
+                      We've quietly rebuilt Forge from the ground up. New
+                      agents, a calmer editor, and a chat that finally feels like
+                      yours…
+                    </Bubble>
+                  </div>
                 </div>
               </div>
             </div>

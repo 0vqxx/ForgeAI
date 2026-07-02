@@ -30,16 +30,14 @@ function Dashboard() {
         supabase.from("projects").select("id", { count: "exact", head: true }),
       ]);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      let convos: ConversationRow[] = [];
-      if (session?.access_token) {
-        const res = await fetch("/api/conversations", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (res.ok) convos = await res.json();
-      }
-      setCounts({ chats: convos.length, agents: a.count ?? 0, projects: p.count ?? 0 });
-      setRecent(convos.slice(0, 5));
+      const { data: convos } = await supabase
+        .from("conversations")
+        .select("id, title, created_at, updated_at, model")
+        .order("updated_at", { ascending: false });
+
+      const chatList = (convos ?? []) as ConversationRow[];
+      setCounts({ chats: chatList.length, agents: a.count ?? 0, projects: p.count ?? 0 });
+      setRecent(chatList.slice(0, 5));
     })();
   }, []);
 
@@ -98,7 +96,7 @@ function Dashboard() {
   );
 }
 
-function Stat({ label, value, icon: Icon, to }: { label: string; value: number | null; icon: typeof MessageSquareText; to: "/chat" | "/agents" | "/projects" }) {
+function Stat({ label, value, icon: Icon, to }: { label: string; value: number | null; icon: typeof MessageSquareText; to: "/chat" | "/projects" }) {
   return (
     <Link to={to} className="elev-1 group rounded-2xl border border-border/60 bg-elevated/70 p-5 transition-all hover:-translate-y-0.5 hover:elev-2">
       <div className="flex items-center justify-between">

@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_authenticated/chat/$id")({
 
 function ChatRoute() {
   const { id } = Route.useParams();
-  return <ChatThread id={id} />;
+  return <ChatThread key={id} id={id} />;
 }
