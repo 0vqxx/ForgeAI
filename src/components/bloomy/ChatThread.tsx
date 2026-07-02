@@ -35,11 +35,13 @@ async function authHeaders(): Promise<Record<string, string>> {
 async function fetchJSON(url: string, opts?: RequestInit) {
   const headers = await authHeaders();
   const merged = opts?.headers ? { ...headers, ...(opts.headers as Record<string, string>) } : headers;
-  console.log("[fetchJSON] Request:", url, opts?.method || "GET", headers);
+  console.log("[fetchJSON] Request:", url, opts?.method || "GET");
   const res = await fetch(url, { ...opts, headers: merged });
   console.log("[fetchJSON] Response status:", res.status, res.statusText);
   if (!res.ok) {
-    console.error("[fetchJSON] Request failed:", res.status, res.statusText);
+    // Try to read the error body for better diagnostics
+    const errBody = await res.text().catch(() => "");
+    console.error("[fetchJSON] Request failed:", res.status, res.statusText, errBody);
     return null;
   }
   const data = await res.json();
