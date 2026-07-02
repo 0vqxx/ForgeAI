@@ -1,17 +1,41 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ChatThread } from "@/components/bloomy/ChatThread";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-/** New-chat route: show the composer immediately; persist only after the first send. */
+/**
+ * Claude-like chat route: when user visits /chat, automatically create a new
+ * persisted conversation and redirect to /chat/$id. This ensures every chat
+ * has a persistent ID from the start, making it easier to save and manage.
+ */
 export const Route = createFileRoute("/_authenticated/chat")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    t: typeof search.t === "string" ? search.t : undefined,
-  }),
   head: () => ({ meta: [{ title: "Chat \u2014 Forge" }] }),
-  component: ChatPage,
+  component: ChatRedirect,
 });
 
-function ChatPage() {
-  const { t } = Route.useSearch();
-  return <ChatThread key={t ?? "new"} />;
+function ChatRedirect() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    async function create() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ title: "New chat" }),
+      });
+      if (!res.ok) {
+        toast.error("Failed to create chat");
+        return;
+      }
+      const chat = await res.json();
+      navigate({ to: "/chat/$id", params: { id: chat.id }, replace: true });
+    }
+    create();
+  }, [navigate]);
+  return null;
 }
 

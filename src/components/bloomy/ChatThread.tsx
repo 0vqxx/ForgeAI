@@ -40,7 +40,7 @@ async function fetchJSON(url: string, opts?: RequestInit) {
   return res.json() as Promise<any>;
 }
 
-export function ChatThread({ id }: { id?: string }) {
+export function ChatThread({ id }: { id: string }) {
   const navigate = useNavigate();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [title, setTitle] = useState("New chat");
@@ -48,24 +48,26 @@ export function ChatThread({ id }: { id?: string }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-  const [loading, setLoading] = useState(!!id);
+  const [loading, setLoading] = useState(true);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const titleRef = useRef("New chat");
   const msgsRef = useRef<ChatMessage[]>([]);
-  const convoId = useRef(id ?? "");
-  const isNew = useRef(!id);
+  const convoId = useRef(id);
+  const isNew = useRef(true);
 
   useEffect(() => {
-    if (!id) return;
-
     let cancelled = false;
 
     async function load() {
-      convoId.current = id;
       const convo = await fetchJSON(`/api/conversations/${id}`);
       if (cancelled) return;
 
+      // If we successfully retrieved a conversation, it is definitely not a new one.
+      // Previously the code attempted to check a non‑existent `convo.message` field,
+      // which could leave `isNew.current` true and cause a duplicate conversation
+      // to be created on the next send. We now treat any fetched conversation as
+      // existing and clear the `isNew` flag.
       if (convo) {
         isNew.current = false;
         titleRef.current = convo.title ?? "New chat";
@@ -86,6 +88,32 @@ export function ChatThread({ id }: { id?: string }) {
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, streaming]);
+
+  // Auto-save input when leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (input.trim() && msgsRef.current.length === 0) {
+        localStorage.setItem(`draft-${convoId.current || 'new'}`, input);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      handleBeforeUnload();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [input]);
+
+  // Load draft on mount
+  useEffect(() => {
+    if (!id && msgsRef.current.length === 0) {
+      const draft = localStorage.getItem(`draft-new`);
+      if (draft) {
+        setInput(draft);
+        localStorage.removeItem(`draft-new`);
+      }
+    }
+  }, [id]);
 
   function refreshSidebar() {
     window.dispatchEvent(new Event("forge:refresh-chats"));
@@ -184,9 +212,11 @@ export function ChatThread({ id }: { id?: string }) {
     } finally {
       setStreaming(false);
       setSigningIn(false);
-      if (!id || id !== apiId) {
-        navigate({ to: "/chat/$id", params: { id: apiId }, replace: true });
-      }
+      // After the first message we always want to be on the dedicated chat page for the
+      // newly created conversation. Previously we only navigated when the pathname
+      // was exactly "/chat", which could fail in edge cases (e.g., trailing slash or
+      // different base). Unconditionally navigate to the conversation route.
+      navigate({ to: "/chat/$id", params: { id: apiId }, replace: true });
     }
   }
 
