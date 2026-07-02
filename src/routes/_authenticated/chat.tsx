@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatThread } from "@/components/bloomy/ChatThread";
-import { useEffect } from "react";
 
 /**
- * Chat route: create a new conversation immediately and navigate to it.
- * This ensures we have a proper UUID from the database from the start.
+ * Chat route: render ChatThread with a generated ID.
+ * Conversation is created lazily on first message.
  */
 export const Route = createFileRoute("/_authenticated/chat")({
   head: () => ({ meta: [{ title: "Chat \u2014 Forge" }] }),
@@ -12,34 +11,8 @@ export const Route = createFileRoute("/_authenticated/chat")({
 });
 
 function ChatRoute() {
-  const navigate = Route.useNavigate();
-
-  // Create a new conversation immediately on mount
-  useEffect(() => {
-    async function createNewConversation() {
-      try {
-        const response = await fetch("/api/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: "New chat", model: "claude-sonnet-4-6" }),
-        });
-        const data = await response.json();
-        if (data.id) {
-          // Navigate to the new conversation with its proper UUID
-          navigate({ to: "/chat/$id", params: { id: data.id }, replace: true });
-        }
-      } catch (error) {
-        console.error("Failed to create conversation:", error);
-      }
-    }
-
-    createNewConversation();
-  }, [navigate]);
-
-  return (
-    <div className="flex h-[calc(100dvh-3.5rem)] items-center justify-center">
-      <div className="text-text-muted">Creating new chat...</div>
-    </div>
-  );
+  // Generate a unique ID for this session
+  const id = Date.now().toString();
+  return <ChatThread id={id} />;
 }
 
