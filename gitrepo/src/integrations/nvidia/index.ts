@@ -3,8 +3,7 @@
 
 export type NvidiaModel =
   | "moonshotai/kimi-k2.6"
-  | "z-ai/glm-5.2"
-  | "z-ai/glm-5.1";
+  | "z-ai/glm-5.2";
 
 export type ModelProvider = "moonshot" | "z-ai";
 
@@ -17,12 +16,11 @@ export interface ModelInfo {
 export const NVIDIA_MODELS: Record<NvidiaModel, ModelInfo> = {
   "moonshotai/kimi-k2.6": { label: "Kimi K2.6", provider: "moonshot", providerLabel: "Moonshot AI" },
   "z-ai/glm-5.2": { label: "GLM 5.2", provider: "z-ai", providerLabel: "Zhipu AI" },
-  "z-ai/glm-5.1": { label: "GLM 5.1", provider: "z-ai", providerLabel: "Zhipu AI" },
 };
 
 export const PROVIDER_GROUPS: { provider: ModelProvider; label: string; models: NvidiaModel[] }[] = [
   { provider: "moonshot", label: "Moonshot AI", models: ["moonshotai/kimi-k2.6"] },
-  { provider: "z-ai", label: "Zhipu AI", models: ["z-ai/glm-5.2", "z-ai/glm-5.1"] },
+  { provider: "z-ai", label: "Zhipu AI", models: ["z-ai/glm-5.2"] },
 ];
 
 export class NvidiaAI {
