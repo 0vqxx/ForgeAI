@@ -60,27 +60,36 @@ export function ChatThread({ id }: { id: string }) {
     let cancelled = false;
 
     async function load() {
-      const convo = await fetchJSON(`/api/conversations/${id}`);
-      if (cancelled) return;
+      try {
+        const convo = await fetchJSON(`/api/conversations/${id}`);
+        if (cancelled) return;
 
-      // If we successfully retrieved a conversation, load its data.
-      // If the conversation doesn't exist yet (new chat), we'll create it on first message.
-      if (convo) {
-        isNew.current = false;
-        titleRef.current = convo.title ?? "New chat";
-        setTitle(convo.title ?? "New chat");
-        if (convo.model) setModel(convo.model);
-        const loaded = (convo.messages ?? []).map(toChatMessage);
-        msgsRef.current = loaded;
-        setMsgs(loaded);
-      } else {
-        // Conversation doesn't exist yet - this is a new chat
-        // It will be created when the user sends the first message
+        // If we successfully retrieved a conversation, load its data.
+        // If the conversation doesn't exist yet (new chat), we'll create it on first message.
+        if (convo) {
+          isNew.current = false;
+          titleRef.current = convo.title ?? "New chat";
+          setTitle(convo.title ?? "New chat");
+          if (convo.model) setModel(convo.model);
+          const loaded = (convo.messages ?? []).map(toChatMessage);
+          msgsRef.current = loaded;
+          setMsgs(loaded);
+        } else {
+          // Conversation doesn't exist yet - this is a new chat
+          // It will be created when the user sends the first message
+          isNew.current = true;
+          convoId.current = id;
+        }
+      } catch (error) {
+        console.error("Failed to load conversation:", error);
+        // On error, treat as new chat
         isNew.current = true;
         convoId.current = id;
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-
-      setLoading(false);
     }
 
     load();
@@ -116,21 +125,6 @@ export function ChatThread({ id }: { id: string }) {
       }
     }
   }, [id]);
-
-  // Pre-authenticate with Puter AI on mount to avoid popup delays during chat
-  useEffect(() => {
-    async function preAuth() {
-      try {
-        if (puterAI.isAvailable() && !puterAI.isSignedIn()) {
-          await puterAI.ensureAuth();
-        }
-      } catch (err) {
-        // Silent fail - we'll try again when user sends a message
-        console.log("Pre-auth failed, will retry on send:", err);
-      }
-    }
-    preAuth();
-  }, []);
 
   function refreshSidebar() {
     window.dispatchEvent(new Event("forge:refresh-chats"));
