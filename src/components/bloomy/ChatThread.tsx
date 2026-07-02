@@ -140,8 +140,19 @@ export function ChatThread({ id }: { id: string }) {
       }
     }
 
+    // Add timeout to ensure loading always clears
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        console.log("[ChatThread] Timeout reached, forcing loading to false");
+        setLoading(false);
+      }
+    }, 5000);
+
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [id]);
 
   useEffect(() => {
