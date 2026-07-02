@@ -49,6 +49,7 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<ConversationRow[]>([]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
