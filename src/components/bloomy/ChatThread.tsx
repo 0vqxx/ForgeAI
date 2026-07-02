@@ -208,14 +208,21 @@ export function ChatThread({ id }: { id: string }) {
         return convoId.current;
       }
       // Create new conversation
+      console.log("[ChatThread] Creating new conversation with title:", t);
       const convo = await fetchJSON("/api/conversations", {
         method: "POST",
         body: JSON.stringify({ title: t, model }),
       });
-      if (!convo) return null;
+      if (!convo) {
+        console.error("[ChatThread] Failed to create conversation");
+        return null;
+      }
+      console.log("[ChatThread] Created conversation with ID:", convo.id);
       // Use the ID returned by the API
       convoId.current = convo.id;
       isNew.current = false;
+      // Navigate to the correct URL with the server-generated ID
+      navigate({ to: "/chat/$id", params: { id: convo.id }, replace: true });
       return convo.id;
     }
 
