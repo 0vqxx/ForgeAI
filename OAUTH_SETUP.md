@@ -20,18 +20,18 @@ There are **two places** where redirect URLs need to be configured — the OAuth
 
 1. Go to Supabase Dashboard → Authentication → Providers
 2. Click **Google** → toggle **Enable Sign in with Google** ON
-3. Paste your credentials:
-   - **Client ID**: `782081669785-uhif8o5rkl91qmqcnse18a50lc1vbrmj.apps.googleusercontent.com`
-   - **Client Secret**: `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`
+3. Paste your credentials (from [Google Cloud Console](https://console.cloud.google.com)):
+   - **Client ID**: `YOUR_GOOGLE_CLIENT_ID`
+   - **Client Secret**: `YOUR_GOOGLE_CLIENT_SECRET`
 4. Click Save
 
 ## Enable Discord OAuth in Supabase
 
 1. Go to Supabase Dashboard → Authentication → Providers
 2. Click **Discord** → toggle **Enable Sign in with Discord** ON
-3. Paste your credentials:
-   - **Client ID**: `1518000230027755520`
-   - **Client Secret**: `muiVy-ctua7Go3MA5jm-10j9kNp9bTn2`
+3. Paste your credentials (from [Discord Developer Portal](https://discord.com/developers)):
+   - **Client ID**: `YOUR_DISCORD_CLIENT_ID`
+   - **Client Secret**: `YOUR_DISCORD_CLIENT_SECRET`
 4. Click Save
 
 ---
