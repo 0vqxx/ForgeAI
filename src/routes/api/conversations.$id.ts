@@ -1,28 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createSupabaseContext } from "@supabase/server";
-import type { Database } from "@/integrations/supabase/types";
+import { getAuthContext } from "@/lib/api-auth";
 
 export const Route = createFileRoute("/api/conversations/$id")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
-        if (error) {
-          return Response.json({ message: error.message }, { status: error.status });
-        }
+        const auth = await getAuthContext(request);
+        if (!auth.ok) return auth.response;
 
-        const { data, error: dbError } = await ctx.supabase
+        const { data, error } = await auth.supabase
           .from("conversations")
           .select("id, title, created_at, updated_at, model")
           .eq("id", params.id)
           .single();
 
-        if (dbError) {
-          const status = dbError.code === "PGRST116" ? 404 : 500;
-          return Response.json({ message: dbError.message }, { status });
+        if (error) {
+          const status = error.code === "PGRST116" ? 404 : 500;
+          return Response.json({ message: error.message }, { status });
         }
 
-        const { data: messages, error: msgError } = await ctx.supabase
+        const { data: messages, error: msgError } = await auth.supabase
           .from("messages")
           .select("id, role, content, created_at")
           .eq("conversation_id", params.id)
@@ -36,10 +33,8 @@ export const Route = createFileRoute("/api/conversations/$id")({
       },
 
       PATCH: async ({ request, params }) => {
-        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
-        if (error) {
-          return Response.json({ message: error.message }, { status: error.status });
-        }
+        const auth = await getAuthContext(request);
+        if (!auth.ok) return auth.response;
 
         const body = await request.json().catch(() => ({}));
         const updates: { title?: string; model?: string } = {};
@@ -50,33 +45,31 @@ export const Route = createFileRoute("/api/conversations/$id")({
           return Response.json({ message: "no fields to update" }, { status: 400 });
         }
 
-        const { data, error: dbError } = await ctx.supabase
+        const { data, error } = await auth.supabase
           .from("conversations")
           .update(updates)
           .eq("id", params.id)
           .select("id, title, created_at, updated_at, model")
           .single();
 
-        if (dbError) {
-          return Response.json({ message: dbError.message }, { status: 500 });
+        if (error) {
+          return Response.json({ message: error.message }, { status: 500 });
         }
 
         return Response.json(data);
       },
 
       DELETE: async ({ request, params }) => {
-        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
-        if (error) {
-          return Response.json({ message: error.message }, { status: error.status });
-        }
+        const auth = await getAuthContext(request);
+        if (!auth.ok) return auth.response;
 
-        const { error: dbError } = await ctx.supabase
+        const { error } = await auth.supabase
           .from("conversations")
           .delete()
           .eq("id", params.id);
 
-        if (dbError) {
-          return Response.json({ message: dbError.message }, { status: 500 });
+        if (error) {
+          return Response.json({ message: error.message }, { status: 500 });
         }
 
         return new Response(null, { status: 204 });

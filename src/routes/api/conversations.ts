@@ -1,23 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createSupabaseContext } from "@supabase/server";
-import type { Database } from "@/integrations/supabase/types";
+import { getAuthContext } from "@/lib/api-auth";
 
 export const Route = createFileRoute("/api/conversations")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
-        if (error) {
-          return Response.json({ message: error.message }, { status: error.status });
-        }
+        const auth = await getAuthContext(request);
+        if (!auth.ok) return auth.response;
 
-        const { data, error: dbError } = await ctx.supabase
+        const { data, error } = await auth.supabase
           .from("conversations")
           .select("id, title, created_at, updated_at, model")
           .order("updated_at", { ascending: false });
 
-        if (dbError) {
-          return Response.json({ message: dbError.message }, { status: 500 });
+        if (error) {
+          return Response.json({ message: error.message }, { status: 500 });
         }
 
         return Response.json(data ?? []);
@@ -25,31 +22,29 @@ export const Route = createFileRoute("/api/conversations")({
 
       POST: async ({ request }) => {
         console.log("[API] POST /api/conversations - Creating conversation");
-        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
-        if (error) {
-          console.error("[API] Auth error:", error);
-          return Response.json({ message: error.message }, { status: error.status });
+        const auth = await getAuthContext(request);
+        if (!auth.ok) {
+          console.error("[API] Auth failed");
+          return auth.response;
         }
 
         const body = await request.json().catch(() => ({}));
         const { title, model } = body as { title?: string; model?: string };
-        console.log("[API] Request body:", { title, model, userId: ctx.userClaims!.id });
+        console.log("[API] Creating conversation:", { title, model, userId: auth.userId });
 
-        const insertData: any = {
-          user_id: ctx.userClaims!.id,
-          title: title || "New chat",
-          model: model || "claude-sonnet-4-6",
-        };
-
-        const { data, error: dbError } = await ctx.supabase
+        const { data, error } = await auth.supabase
           .from("conversations")
-          .insert(insertData)
+          .insert({
+            user_id: auth.userId,
+            title: title || "New chat",
+            model: model || "claude-sonnet-4-6",
+          })
           .select("id, title, created_at, updated_at, model")
           .single();
 
-        if (dbError) {
-          console.error("[API] Database error:", dbError);
-          return Response.json({ message: dbError.message }, { status: 500 });
+        if (error) {
+          console.error("[API] Database error:", error);
+          return Response.json({ message: error.message }, { status: 500 });
         }
 
         console.log("[API] Created conversation:", data);
