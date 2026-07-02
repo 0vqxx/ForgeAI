@@ -15,14 +15,19 @@ export const Route = createFileRoute("/_authenticated/chat")({
 function ChatRedirect() {
   const navigate = useNavigate();
   useEffect(() => {
+    console.log("[ChatRedirect] Redirecting to new conversation");
     // Generate a unique ID and redirect immediately
     const newConversationId = Date.now().toString();
+    console.log("[ChatRedirect] Generated ID:", newConversationId);
     navigate({ to: "/chat/$id", params: { id: newConversationId }, replace: true });
   }, [navigate]);
 
   return (
-    <div className="flex h-screen items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-text-muted" />
+    <div className="flex h-screen items-center justify-center bg-background">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-text-muted mx-auto mb-4" />
+        <p className="text-sm text-text-muted">Loading chat...</p>
+      </div>
     </div>
   );
 }

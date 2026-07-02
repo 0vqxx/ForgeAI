@@ -41,6 +41,7 @@ async function fetchJSON(url: string, opts?: RequestInit) {
 }
 
 export function ChatThread({ id }: { id: string }) {
+  console.log("[ChatThread] Mounted with id:", id);
   const navigate = useNavigate();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [title, setTitle] = useState("New chat");
@@ -60,8 +61,10 @@ export function ChatThread({ id }: { id: string }) {
     let cancelled = false;
 
     async function load() {
+      console.log("[ChatThread] Loading conversation:", id);
       try {
         const convo = await fetchJSON(`/api/conversations/${id}`);
+        console.log("[ChatThread] Conversation data:", convo);
         if (cancelled) return;
 
         // If we successfully retrieved a conversation, load its data.
@@ -74,20 +77,23 @@ export function ChatThread({ id }: { id: string }) {
           const loaded = (convo.messages ?? []).map(toChatMessage);
           msgsRef.current = loaded;
           setMsgs(loaded);
+          console.log("[ChatThread] Loaded existing conversation with", loaded.length, "messages");
         } else {
           // Conversation doesn't exist yet - this is a new chat
           // It will be created when the user sends the first message
           isNew.current = true;
           convoId.current = id;
+          console.log("[ChatThread] New conversation, will create on first message");
         }
       } catch (error) {
-        console.error("Failed to load conversation:", error);
+        console.error("[ChatThread] Failed to load conversation:", error);
         // On error, treat as new chat
         isNew.current = true;
         convoId.current = id;
       } finally {
         if (!cancelled) {
           setLoading(false);
+          console.log("[ChatThread] Loading complete, loading state:", false);
         }
       }
     }
