@@ -35,9 +35,16 @@ async function authHeaders(): Promise<Record<string, string>> {
 async function fetchJSON(url: string, opts?: RequestInit) {
   const headers = await authHeaders();
   const merged = opts?.headers ? { ...headers, ...(opts.headers as Record<string, string>) } : headers;
+  console.log("[fetchJSON] Request:", url, opts?.method || "GET", headers);
   const res = await fetch(url, { ...opts, headers: merged });
-  if (!res.ok) return null;
-  return res.json() as Promise<any>;
+  console.log("[fetchJSON] Response status:", res.status, res.statusText);
+  if (!res.ok) {
+    console.error("[fetchJSON] Request failed:", res.status, res.statusText);
+    return null;
+  }
+  const data = await res.json();
+  console.log("[fetchJSON] Response data:", data);
+  return data;
 }
 
 export function ChatThread({ id }: { id: string }) {
