@@ -190,6 +190,13 @@ export function ChatThread({ id }: { id: string }) {
 
     async function getApiId(): Promise<string | null> {
       if (!isNew.current) return convoId.current;
+      // Check if conversation already exists in database
+      const existing = await fetchJSON(`/api/conversations/${convoId.current}`);
+      if (existing) {
+        isNew.current = false;
+        return convoId.current;
+      }
+      // Create new conversation
       const convo = await fetchJSON("/api/conversations", {
         method: "POST",
         body: JSON.stringify({ title: t, model }),
