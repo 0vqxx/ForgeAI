@@ -161,7 +161,7 @@ export function ChatThread({ id }: { id: string }) {
 
     const apiId = await getApiId();
     if (!apiId) {
-      toast.error("Failed to create conversation. Check SUPABASE_SECRET_KEY in .env");
+      toast.error("Failed to create conversation. Please try again.");
       return;
     }
 

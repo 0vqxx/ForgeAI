@@ -290,7 +290,10 @@ function NavSection({ items, pathname, onChat }: { items: NavItem[]; pathname: s
     <nav className="flex flex-col gap-0.5">
       {items.map((item, i) => {
         const Icon = item.icon;
-        const isActive = !item.soon && pathname.startsWith(item.to) && item.to !== "/";
+        // For Chat button, only active when exactly on /chat, not on /chat/$id
+        const isActive = !item.soon && (
+          item.to === "/chat" ? pathname === "/chat" : pathname.startsWith(item.to)
+        ) && item.to !== "/";
 
         if (item.to === "/chat" && onChat) {
           return (
