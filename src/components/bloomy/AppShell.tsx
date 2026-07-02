@@ -257,9 +257,13 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
           <NavSection items={SECONDARY_NAV} pathname={pathname} />
           <div className="mt-auto">
             <div className="elev-1 flex items-center gap-2 rounded-xl border border-border/60 bg-elevated/70 p-2">
-              <div className="elev-1 grid h-8 w-8 shrink-0 place-items-center rounded-full forge-gradient-bg text-[12px] font-semibold text-white">
+              <button
+                onClick={() => {/* TODO: Open profile picture upload */}}
+                className="elev-1 grid h-8 w-8 shrink-0 place-items-center rounded-full forge-gradient-bg text-[12px] font-semibold text-white hover:opacity-80 transition-opacity"
+                title="Change profile picture"
+              >
                 {(email || "?").slice(0, 1).toUpperCase()}
-              </div>
+              </button>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12px] font-medium text-foreground">{email || "Loading..."}</div>
                 <div className="text-[10px] uppercase tracking-wider text-text-muted">Forge account</div>
