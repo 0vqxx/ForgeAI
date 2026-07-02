@@ -198,8 +198,6 @@ export function ChatThread({ id }: { id: string }) {
       // Use the ID returned by the API
       convoId.current = convo.id;
       isNew.current = false;
-      // Navigate to the correct URL with the server-generated ID
-      navigate({ to: "/chat/$id", params: { id: convo.id }, replace: true });
       return convo.id;
     }
 
@@ -274,11 +272,6 @@ export function ChatThread({ id }: { id: string }) {
     } finally {
       setStreaming(false);
       setSigningIn(false);
-      // After the first message we always want to be on the dedicated chat page for the
-      // newly created conversation. Previously we only navigated when the pathname
-      // was exactly "/chat", which could fail in edge cases (e.g., trailing slash or
-      // different base). Unconditionally navigate to the conversation route.
-      navigate({ to: "/chat/$id", params: { id: apiId }, replace: true });
     }
   }
 
