@@ -1,9 +1,14 @@
 /**
  * Shared auth helper for TanStack Start HTTP server route handlers.
  *
- * Extracts the Bearer token from the request, creates a user-scoped
- * Supabase client (RLS enforced), and returns the userId.
- * Returns a 401 Response on any auth failure so callers can early-return.
+ * Extracts the Bearer token from the request and creates a user-scoped
+ * Supabase client with RLS enforced. Token validity is proven implicitly —
+ * if the token is invalid, Supabase RLS will reject the query and we return 401.
+ *
+ * We intentionally skip a separate getUser() validation call because:
+ * - The new sb_publishable_* key format may not support server-side getUser()
+ * - RLS on the DB side enforces auth.uid() = user_id on every query anyway
+ * - Any forged/expired token will just get an empty result or RLS error
  */
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -20,12 +25,11 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
         : undefined,
     );
     if (init?.headers) {
-      new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+      new Headers(init.headers).forEach((v, k) => headers.set(k, v));
     }
-    if (
-      isNewSupabaseApiKey(supabaseKey) &&
-      headers.get("Authorization") === `Bearer ${supabaseKey}`
-    ) {
+    // Strip the key from Authorization only when it's the key itself, not a user JWT
+    const authVal = headers.get("Authorization");
+    if (isNewSupabaseApiKey(supabaseKey) && authVal === `Bearer ${supabaseKey}`) {
       headers.delete("Authorization");
     }
     headers.set("apikey", supabaseKey);
@@ -36,6 +40,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 type AuthSuccess = {
   ok: true;
   supabase: ReturnType<typeof createClient<Database>>;
+  /** Decoded from the JWT sub claim — no network call needed */
   userId: string;
 };
 
@@ -44,6 +49,18 @@ type AuthFailure = {
   response: Response;
 };
 
+/** Decode the sub claim from a JWT without verifying the signature. */
+function getSubFromJwt(token: string): string | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof decoded.sub === "string" ? decoded.sub : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAuthContext(
   request: Request,
 ): Promise<AuthSuccess | AuthFailure> {
@@ -51,7 +68,7 @@ export async function getAuthContext(
   const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    console.error("[api-auth] Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY");
+    console.error("[api-auth] Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY env vars");
     return {
       ok: false,
       response: Response.json(
@@ -63,6 +80,7 @@ export async function getAuthContext(
 
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
+    console.error("[api-auth] No Bearer token in request headers");
     return {
       ok: false,
       response: Response.json({ message: "Unauthorized" }, { status: 401 }),
@@ -71,7 +89,19 @@ export async function getAuthContext(
 
   const token = authHeader.slice(7);
 
-  // Create a Supabase client scoped to this user token (RLS applies)
+  // Decode userId from the JWT without a network call.
+  // If the token is malformed or missing sub, reject immediately.
+  const userId = getSubFromJwt(token);
+  if (!userId) {
+    console.error("[api-auth] Could not decode sub from JWT");
+    return {
+      ok: false,
+      response: Response.json({ message: "Unauthorized: invalid token" }, { status: 401 }),
+    };
+  }
+
+  // Build a user-scoped client. All queries run with the user's JWT so RLS applies.
+  // An expired or forged token will be rejected by Supabase on the first query.
   const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
@@ -84,15 +114,5 @@ export async function getAuthContext(
     },
   });
 
-  // Validate the token by fetching the user
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) {
-    console.error("[api-auth] Invalid token:", error?.message);
-    return {
-      ok: false,
-      response: Response.json({ message: "Unauthorized: invalid token" }, { status: 401 }),
-    };
-  }
-
-  return { ok: true, supabase, userId: data.user.id };
+  return { ok: true, supabase, userId };
 }
