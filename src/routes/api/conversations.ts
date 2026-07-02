@@ -38,6 +38,11 @@ export const Route = createFileRoute("/api/conversations")({
           model: model || "claude-sonnet-4-6",
         };
 
+        // If an ID is provided, use it (for client-generated IDs)
+        if (id) {
+          insertData.id = id;
+        }
+
         const { data, error: dbError } = await ctx.supabase
           .from("conversations")
           .insert(insertData)
