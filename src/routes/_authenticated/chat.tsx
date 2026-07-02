@@ -11,8 +11,9 @@ export const Route = createFileRoute("/_authenticated/chat")({
 });
 
 function ChatRoute() {
-  // Generate a unique ID for this session
-  const id = Date.now().toString();
-  return <ChatThread id={id} />;
+  // Use the search param 't' as a key to force remount when clicking +
+  const search = Route.useSearch();
+  const id = (search.t || Date.now().toString()) as string;
+  return <ChatThread key={id} id={id} />;
 }
 
