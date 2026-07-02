@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/conversations/$id")({
           .from("conversations")
           .select("id, title, created_at, updated_at, model")
           .eq("id", params.id)
+          .eq("user_id", auth.userId)
           .single();
 
         if (error) {
@@ -49,6 +50,7 @@ export const Route = createFileRoute("/api/conversations/$id")({
           .from("conversations")
           .update(updates)
           .eq("id", params.id)
+          .eq("user_id", auth.userId)
           .select("id, title, created_at, updated_at, model")
           .single();
 
@@ -66,7 +68,8 @@ export const Route = createFileRoute("/api/conversations/$id")({
         const { error } = await auth.supabase
           .from("conversations")
           .delete()
-          .eq("id", params.id);
+          .eq("id", params.id)
+          .eq("user_id", auth.userId);
 
         if (error) {
           return Response.json({ message: error.message }, { status: 500 });

@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/conversations")({
         const { data, error } = await auth.supabase
           .from("conversations")
           .select("id, title, created_at, updated_at, model")
+          .eq("user_id", auth.userId)
           .order("updated_at", { ascending: false });
 
         if (error) {
