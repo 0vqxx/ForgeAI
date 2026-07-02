@@ -192,12 +192,15 @@ export function ChatThread({ id }: { id: string }) {
       if (!isNew.current) return convoId.current;
       const convo = await fetchJSON("/api/conversations", {
         method: "POST",
-        body: JSON.stringify({ title: t, model, id: convoId.current }),
+        body: JSON.stringify({ title: t, model }),
       });
       if (!convo) return null;
-      // Use the ID we already have from the URL
+      // Use the ID returned by the API
+      convoId.current = convo.id;
       isNew.current = false;
-      return convoId.current;
+      // Navigate to the correct URL with the server-generated ID
+      navigate({ to: "/chat/$id", params: { id: convo.id }, replace: true });
+      return convo.id;
     }
 
     const apiId = await getApiId();

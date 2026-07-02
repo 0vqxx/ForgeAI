@@ -30,18 +30,13 @@ export const Route = createFileRoute("/api/conversations")({
         }
 
         const body = await request.json().catch(() => ({}));
-        const { title, model, id } = body as { title?: string; model?: string; id?: string };
+        const { title, model } = body as { title?: string; model?: string };
 
         const insertData: any = {
           user_id: ctx.userClaims!.id,
           title: title || "New chat",
           model: model || "claude-sonnet-4-6",
         };
-
-        // If an ID is provided, use it (for client-generated IDs)
-        if (id) {
-          insertData.id = id;
-        }
 
         const { data, error: dbError } = await ctx.supabase
           .from("conversations")
