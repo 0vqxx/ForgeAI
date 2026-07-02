@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/bloomy/AppShell";
 import { ForgeMark } from "@/components/bloomy/Logo";
 import { ModelSelector } from "@/components/bloomy/ModelSelector";
@@ -7,7 +6,6 @@ import { puterAI, type PuterModel } from "@/integrations/puter";
 import { ArrowUp, Loader2, Paperclip, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { MessageRow } from "@/lib/api";
 
 interface ChatMessage {
   id: string;
@@ -16,49 +14,14 @@ interface ChatMessage {
   timestamp: string;
 }
 
-function toChatMessage(m: MessageRow): ChatMessage {
-  return {
-    id: m.id,
-    role: m.role as "user" | "assistant" | "system",
-    content: m.content,
-    timestamp: m.created_at,
-  };
-}
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token
-    ? { Authorization: `Bearer ${data.session.access_token}`, "Content-Type": "application/json" }
-    : { "Content-Type": "application/json" };
-}
-
-async function fetchJSON(url: string, opts?: RequestInit) {
-  const headers = await authHeaders();
-  const merged = opts?.headers ? { ...headers, ...(opts.headers as Record<string, string>) } : headers;
-  console.log("[fetchJSON] Request:", url, opts?.method || "GET");
-  const res = await fetch(url, { ...opts, headers: merged });
-  console.log("[fetchJSON] Response status:", res.status, res.statusText);
-  if (!res.ok) {
-    // Try to read the error body for better diagnostics
-    const errBody = await res.text().catch(() => "");
-    console.error("[fetchJSON] Request failed:", res.status, res.statusText, errBody);
-    return null;
-  }
-  const data = await res.json();
-  console.log("[fetchJSON] Response data:", data);
-  return data;
-}
-
 export function ChatThread({ id }: { id: string }) {
-  console.log("[ChatThread] Mounted with id:", id);
-  const navigate = useNavigate();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [title, setTitle] = useState("New chat");
   const [model, setModel] = useState<PuterModel>("claude-sonnet-4-6");
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -81,16 +44,11 @@ export function ChatThread({ id }: { id: string }) {
     const codeRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const files: { name: string; content: string }[] = [];
     let match: RegExpExecArray | null;
-
     while ((match = codeRegex.exec(content)) !== null) {
       const lang = match[1] || "txt";
-      const code = match[2];
-      files.push({ name: `code_${files.length + 1}.${lang}`, content: code });
+      files.push({ name: `code_${files.length + 1}.${lang}`, content: match[2] });
     }
-
     if (files.length === 0) return;
-
-    // Create a simple text file with all code blocks
     const allCode = files.map((f, i) => `=== File ${i + 1}: ${f.name} ===\n${f.content}\n\n`).join("\n");
     const blob = new Blob([allCode], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -101,94 +59,110 @@ export function ChatThread({ id }: { id: string }) {
     URL.revokeObjectURL(url);
   }
 
+  // Load existing conversation directly from Supabase
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      console.log("[ChatThread] Loading conversation:", id);
-      try {
-        const convo = await fetchJSON(`/api/conversations/${id}`);
-        console.log("[ChatThread] Conversation data:", convo);
-        if (cancelled) return;
+      const { data: convo } = await supabase
+        .from("conversations")
+        .select("id, title, model")
+        .eq("id", id)
+        .single();
 
-        // If we successfully retrieved a conversation, load its data.
-        // If the conversation doesn't exist yet (new chat), we'll create it on first message.
-        if (convo) {
-          isNew.current = false;
-          titleRef.current = convo.title ?? "New chat";
-          setTitle(convo.title ?? "New chat");
-          if (convo.model) setModel(convo.model);
-          const loaded = (convo.messages ?? []).map(toChatMessage);
+      if (cancelled) return;
+
+      if (convo) {
+        isNew.current = false;
+        titleRef.current = convo.title ?? "New chat";
+        setTitle(convo.title ?? "New chat");
+        if (convo.model) setModel(convo.model as PuterModel);
+
+        const { data: messages } = await supabase
+          .from("messages")
+          .select("id, role, content, created_at")
+          .eq("conversation_id", id)
+          .order("created_at", { ascending: true });
+
+        if (!cancelled && messages) {
+          const loaded: ChatMessage[] = messages.map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant" | "system",
+            content: m.content,
+            timestamp: m.created_at,
+          }));
           msgsRef.current = loaded;
           setMsgs(loaded);
-          console.log("[ChatThread] Loaded existing conversation with", loaded.length, "messages");
-        } else {
-          // Conversation doesn't exist yet - this is a new chat
-          // It will be created when the user sends the first message
-          isNew.current = true;
-          convoId.current = id;
-          console.log("[ChatThread] New conversation, will create on first message");
         }
-      } catch (error) {
-        console.error("[ChatThread] Failed to load conversation:", error);
-        // On error, treat as new chat
+      } else {
         isNew.current = true;
         convoId.current = id;
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          console.log("[ChatThread] Loading complete, loading state:", false);
-        }
       }
+
+      if (!cancelled) setLoading(false);
     }
 
-    // Add timeout to ensure loading always clears
-    const timeout = setTimeout(() => {
-      if (!cancelled) {
-        console.log("[ChatThread] Timeout reached, forcing loading to false");
-        setLoading(false);
-      }
-    }, 5000);
+    load().catch(() => {
+      if (!cancelled) setLoading(false);
+    });
 
-    load();
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-    };
+    return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, streaming]);
 
-  // Auto-save input when leaving the page
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (input.trim() && msgsRef.current.length === 0) {
-        localStorage.setItem(`draft-${convoId.current || 'new'}`, input);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      handleBeforeUnload();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [input]);
-
-  // Load draft on mount
-  useEffect(() => {
-    if (!id && msgsRef.current.length === 0) {
-      const draft = localStorage.getItem(`draft-new`);
-      if (draft) {
-        setInput(draft);
-        localStorage.removeItem(`draft-new`);
-      }
-    }
-  }, [id]);
-
   function refreshSidebar() {
     window.dispatchEvent(new Event("forge:refresh-chats"));
+  }
+
+  async function getOrCreateConvoId(titleForNew: string): Promise<string | null> {
+    if (!isNew.current) return convoId.current;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("You're not signed in.");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("conversations")
+      .insert({
+        id: convoId.current,
+        user_id: user.id,
+        title: titleForNew,
+        model,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      console.error("[ChatThread] Failed to create conversation:", error);
+      toast.error("Failed to create conversation. Please try again.");
+      return null;
+    }
+
+    convoId.current = data.id;
+    isNew.current = false;
+    return data.id;
+  }
+
+  async function saveMessage(conversationId: string, role: "user" | "assistant", content: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({ conversation_id: conversationId, user_id: user.id, role, content })
+      .select("id, role, content, created_at")
+      .single();
+
+    if (error) {
+      console.error("[ChatThread] Failed to save message:", error);
+      return null;
+    }
+    return data;
   }
 
   async function send(e: React.FormEvent, promptText?: string) {
@@ -201,57 +175,20 @@ export function ChatThread({ id }: { id: string }) {
       ? (text.length > 30 ? text.slice(0, 27) + "..." : text)
       : titleRef.current;
 
-    async function getApiId(): Promise<string | null> {
-      if (!isNew.current) return convoId.current;
-      // Check if conversation already exists in database
-      const existing = await fetchJSON(`/api/conversations/${convoId.current}`);
-      if (existing) {
-        isNew.current = false;
-        return convoId.current;
-      }
-      // Create new conversation
-      console.log("[ChatThread] Creating new conversation with title:", t);
-      const convo = await fetchJSON("/api/conversations", {
-        method: "POST",
-        body: JSON.stringify({ title: t, model }),
-      });
-      if (!convo) {
-        console.error("[ChatThread] Failed to create conversation");
-        return null;
-      }
-      console.log("[ChatThread] Created conversation with ID:", convo.id);
-      // Use the ID returned by the API
-      convoId.current = convo.id;
-      isNew.current = false;
-      return convo.id;
-    }
-
-    const apiId = await getApiId();
-    if (!apiId) {
-      toast.error("Failed to create conversation. Please try again.");
-      return;
-    }
+    const apiId = await getOrCreateConvoId(t);
+    if (!apiId) return;
 
     // Update title if needed
     if (t !== titleRef.current) {
       titleRef.current = t;
       setTitle(t);
-      await fetchJSON(`/api/conversations/${apiId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ title: t }),
-      });
+      await supabase.from("conversations").update({ title: t }).eq("id", apiId);
     }
 
     // Save user message
-    console.log("[ChatThread] Saving user message to conversation:", apiId);
-    const savedUser = await fetchJSON(`/api/conversations/${apiId}/messages`, {
-      method: "POST",
-      body: JSON.stringify({ role: "user", content: text }),
-    });
-    console.log("[ChatThread] Saved user message:", savedUser);
-
+    const savedUser = await saveMessage(apiId, "user", text);
     const userMsg: ChatMessage = savedUser
-      ? toChatMessage(savedUser)
+      ? { id: savedUser.id, role: "user", content: savedUser.content, timestamp: savedUser.created_at }
       : { id: Date.now().toString(), role: "user", content: text, timestamp: new Date().toISOString() };
 
     const withUser = [...msgsRef.current, userMsg];
@@ -268,25 +205,32 @@ export function ChatThread({ id }: { id: string }) {
 
       let full = "";
       const assistantId = (Date.now() + 1).toString();
-      const placeholder: ChatMessage = { id: assistantId, role: "assistant", content: "", timestamp: new Date().toISOString() };
+      const placeholder: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+      };
       const withPlaceholder = [...withUser, placeholder];
       msgsRef.current = withPlaceholder;
       setMsgs(withPlaceholder);
 
       await puterAI.chatStream(history, model, (chunk) => {
         full += chunk;
-        const updated = withPlaceholder.map((m) => m.id === assistantId ? { ...m, content: full } : m);
+        const updated = withPlaceholder.map((m) =>
+          m.id === assistantId ? { ...m, content: full } : m
+        );
         msgsRef.current = updated;
         setMsgs([...updated]);
       });
 
-      const savedAssistant = await fetchJSON(`/api/conversations/${apiId}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ role: "assistant", content: full }),
-      });
-
+      const savedAssistant = await saveMessage(apiId, "assistant", full);
       if (savedAssistant) {
-        const final = withPlaceholder.map((m) => m.id === assistantId ? { ...m, id: savedAssistant.id, content: full } : m);
+        const final = withPlaceholder.map((m) =>
+          m.id === assistantId
+            ? { id: savedAssistant.id, role: "assistant" as const, content: full, timestamp: savedAssistant.created_at }
+            : m
+        );
         msgsRef.current = final;
         setMsgs(final);
       }
@@ -359,7 +303,10 @@ export function ChatThread({ id }: { id: string }) {
           )}
         </div>
 
-        <form onSubmit={(e) => void send(e)} className="border-t border-divider bg-background/60 px-6 py-4 backdrop-blur-xl md:px-10">
+        <form
+          onSubmit={(e) => void send(e)}
+          className="border-t border-divider bg-background/60 px-6 py-4 backdrop-blur-xl md:px-10"
+        >
           <div className="mx-auto flex max-w-3xl flex-col gap-2">
             {attachedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -423,19 +370,17 @@ export function ChatThread({ id }: { id: string }) {
   );
 }
 
-/** Helper to render markdown‑like headings and fenced code blocks with copy / download buttons. */
+/** Render markdown-like content with code blocks */
 function renderMessage(content: string) {
   const elements: JSX.Element[] = [];
   const codeRegex = /```([\s\S]*?)```/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-  const codeBlocks: string[] = [];
 
   while ((match = codeRegex.exec(content)) !== null) {
     const before = content.slice(lastIndex, match.index);
     if (before) elements.push(...renderTextBlock(before, elements.length));
     const code = match[1];
-    codeBlocks.push(code);
     const key = `code-${elements.length}`;
     elements.push(
       <pre key={key} className="relative rounded bg-gray-800 p-4 text-sm text-white overflow-x-auto">
@@ -463,7 +408,7 @@ function renderTextBlock(txt: string, startIdx: number): JSX.Element[] {
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       const level = heading[1].length as 1 | 2 | 3 | 4 | 5 | 6;
-      const Tag = (`h${level}`) as keyof JSX.IntrinsicElements;
+      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
       return <Tag key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</Tag>;
     }
     return <p key={`${startIdx}-${i}`} className="whitespace-pre-wrap">{line}</p>;

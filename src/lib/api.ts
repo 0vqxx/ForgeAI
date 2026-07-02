@@ -1,3 +1,7 @@
+/**
+ * Client-side data access — talks directly to Supabase (no /api/* routes).
+ * RLS on the database enforces per-user isolation.
+ */
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ConversationRow {
@@ -19,52 +23,60 @@ export interface ConversationWithMessages extends ConversationRow {
   messages: MessageRow[];
 }
 
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export async function listConversations(): Promise<ConversationRow[]> {
-  const headers = await getAuthHeaders();
-  const res = await fetch("/api/conversations", { headers });
-  if (!res.ok) throw new Error("Failed to fetch conversations");
-  return res.json();
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("id, title, created_at, updated_at, model")
+    .order("updated_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
 export async function getConversation(id: string): Promise<ConversationWithMessages> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/conversations/${id}`, { headers });
-  if (!res.ok) throw new Error("Failed to fetch conversation");
-  return res.json();
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("id, title, created_at, updated_at, model")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(error.message);
+
+  const { data: messages, error: msgError } = await supabase
+    .from("messages")
+    .select("id, role, content, created_at")
+    .eq("conversation_id", id)
+    .order("created_at", { ascending: true });
+  if (msgError) throw new Error(msgError.message);
+
+  return { ...data, messages: (messages ?? []) as MessageRow[] };
 }
 
 export async function createConversation(title?: string, model?: string): Promise<ConversationRow> {
-  const headers = await getAuthHeaders();
-  const res = await fetch("/api/conversations", {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ title, model }),
-  });
-  if (!res.ok) throw new Error("Failed to create conversation");
-  return res.json();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({ user_id: user.id, title: title || "New chat", model: model || "claude-sonnet-4-6" })
+    .select("id, title, created_at, updated_at, model")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function updateConversation(id: string, updates: { title?: string; model?: string }): Promise<ConversationRow> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/conversations/${id}`, {
-    method: "PATCH",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) throw new Error("Failed to update conversation");
-  return res.json();
+  const { data, error } = await supabase
+    .from("conversations")
+    .update(updates)
+    .eq("id", id)
+    .select("id, title, created_at, updated_at, model")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/conversations/${id}`, { method: "DELETE", headers });
-  if (!res.ok) throw new Error("Failed to delete conversation");
+  const { error } = await supabase.from("conversations").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function addMessage(
@@ -72,19 +84,24 @@ export async function addMessage(
   role: "user" | "assistant" | "system",
   content: string,
 ): Promise<MessageRow> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/conversations/${conversationId}/messages`, {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ role, content }),
-  });
-  if (!res.ok) throw new Error("Failed to add message");
-  return res.json();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversationId, user_id: user.id, role, content })
+    .select("id, role, content, created_at")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as MessageRow;
 }
 
 export async function listMessages(conversationId: string): Promise<MessageRow[]> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/conversations/${conversationId}/messages`, { headers });
-  if (!res.ok) throw new Error("Failed to fetch messages");
-  return res.json();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id, role, content, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as MessageRow[];
 }
