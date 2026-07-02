@@ -153,10 +153,10 @@ export function ChatThread({ id }: { id: string }) {
         body: JSON.stringify({ title: t, model, id: convoId.current }),
       });
       if (!convo) return null;
-      // Use the ID we already have from the URL, not the one returned by API
-      // This ensures we stay on the same conversation ID
+      // Use the ID returned by the API (which should match our client ID)
+      convoId.current = convo.id;
       isNew.current = false;
-      return convoId.current;
+      return convo.id;
     }
 
     const apiId = await getApiId();
