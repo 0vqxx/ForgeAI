@@ -116,7 +116,14 @@ export function ChatThread({ id }: { id: string }) {
     let cancelled = false;
 
     async function load() {
-      const { data: convo } = await supabase
+      // Wait for auth session to be restored from storage before querying
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      const { data: convo, error: convoErr } = await supabase
         .from("conversations")
         .select("id, title, model")
         .eq("id", id)
@@ -124,20 +131,28 @@ export function ChatThread({ id }: { id: string }) {
 
       if (cancelled) return;
 
-      if (convo) {
-        isNew.current = false;
-        convoId.current = convo.id;
-        titleRef.current = convo.title ?? "New chat";
-        setTitle(convo.title ?? "New chat");
-        if (convo.model) setModel(convo.model as NvidiaModel);
+      if (convoErr || !convo) {
+        // Conversation not found or access denied — treat as new
+        isNew.current = true;
+        convoId.current = id;
+        if (!cancelled) setLoading(false);
+        return;
+      }
 
-        const { data: messages } = await supabase
-          .from("messages")
-          .select("id, role, content, created_at")
-          .eq("conversation_id", id)
-          .order("created_at", { ascending: true });
+      isNew.current = false;
+      convoId.current = convo.id;
+      titleRef.current = convo.title ?? "New chat";
+      setTitle(convo.title ?? "New chat");
+      if (convo.model) setModel(convo.model as NvidiaModel);
 
-        if (!cancelled && messages) {
+      const { data: messages } = await supabase
+        .from("messages")
+        .select("id, role, content, created_at")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true });
+
+      if (!cancelled) {
+        if (messages && messages.length > 0) {
           const loaded: ChatMessage[] = messages.map((m) => ({
             id: m.id,
             role: m.role as "user" | "assistant" | "system",
@@ -147,12 +162,8 @@ export function ChatThread({ id }: { id: string }) {
           msgsRef.current = loaded;
           setMsgs(loaded);
         }
-      } else {
-        isNew.current = true;
-        convoId.current = id;
+        setLoading(false);
       }
-
-      if (!cancelled) setLoading(false);
     }
 
     load().catch(() => {
