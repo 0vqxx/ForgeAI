@@ -3,7 +3,7 @@ AI Routes for FastAPI backend
 Provides REST API endpoints for AI chat operations with multiple providers
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
@@ -13,45 +13,83 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
 class ChatMessage(BaseModel):
-    """Chat message model"""
-
     role: str  # "user" | "assistant" | "system"
     content: str
 
 
 class ChatRequest(BaseModel):
-    """Chat completion request model"""
-
     messages: List[ChatMessage]
-    provider: str = "openai"  # "openai" | "claude" | "zai"
+    provider: str = "openai"
     model: Optional[str] = None
     temperature: float = 0.7
     max_tokens: Optional[int] = None
     stream: bool = False
+    reasoning_effort: Optional[str] = None
 
 
 class ModelInfo(BaseModel):
-    """Model information"""
-
     provider: str
     models: List[str]
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest):
-    """
-    Send a chat message to the specified AI provider.
-
-    Supports:
-    - OpenAI: gpt-4o, gpt-4-turbo, gpt-4-vision, gpt-4o-mini
-    - Claude: opus-4.1, sonnet-4, haiku-3, fable, coder
-    - Z.ai: glm-5-1, glm-5-2
-    """
+async def chat(request: ChatRequest, http_request: Request):
     try:
-        # Convert messages to dict format
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
-        # Get response
+        from backend.ai_service import ai_service as _ai_svc
+        from backend.ai_sdk_adapter import AIProvider
+        provider_client = _ai_svc.adapter.get_client(AIProvider(request.provider))
+        supports_agent = (
+            hasattr(provider_client, "client") and
+            hasattr(provider_client.client, "chat") and
+            hasattr(provider_client.client.chat, "completions")
+        )
+
+        if supports_agent:
+            system_msg_idx = next((i for i, m in enumerate(messages) if m["role"] == "system"), None)
+            tool_instructions = (
+                "\n\n[AGENT SYSTEM INSTRUCTIONS]\n"
+                "You have access to the following workspace tools. Use them autonomously to fulfill requests:\n"
+                "- read_workspace_file: Read files inside the workspace (restricted from the 'backend' directory).\n"
+                "- write_workspace_file: Write or modify files (restricted from the 'backend' directory).\n"
+                "- execute_command: Run terminal commands like builds or tests (restricted from targeting 'backend').\n"
+                "- web_search: Perform web search for documentation and facts.\n"
+                "- create_zip_archive: Bundle multiple files/folders into a downloadable zip file (places it under /api/downloads/). Use this to give the user zip files of code deliverables.\n"
+                "Always use these tools to research, write, build, verify, and package your code."
+            )
+            if system_msg_idx is not None:
+                messages[system_msg_idx]["content"] += tool_instructions
+            else:
+                messages.insert(0, {"role": "system", "content": f"You are a helpful assistant.{tool_instructions}"})
+
+            user_id = getattr(http_request.state, "user_id", "default")
+
+            from backend.agents.runner import run_agent_loop
+            if request.stream:
+                async def generate():
+                    try:
+                        async for chunk in run_agent_loop(messages, request.model, request.provider, user_id):
+                            yield chunk
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        yield f"Error: {str(e)}"
+                return StreamingResponse(generate(), media_type="text/event-stream")
+            else:
+                full_text = []
+                async for chunk in run_agent_loop(messages, request.model, request.provider, user_id):
+                    if chunk.startswith("\n[TOOL_START:") or chunk.startswith("\n[TOOL_END:"):
+                        continue
+                    full_text.append(chunk)
+                return {
+                    "text": "".join(full_text),
+                    "model": request.model,
+                    "provider": request.provider,
+                    "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    "finish_reason": "stop",
+                }
+
         response = ai_service.chat(
             messages=messages,
             provider=request.provider,
@@ -61,7 +99,6 @@ async def chat(request: ChatRequest):
             stream=request.stream,
         )
 
-        # Handle streaming
         if request.stream:
             async def generate():
                 try:
@@ -69,10 +106,8 @@ async def chat(request: ChatRequest):
                         yield chunk
                 except Exception as e:
                     yield f"Error: {str(e)}"
-
             return StreamingResponse(generate(), media_type="text/event-stream")
 
-        # Handle non-streaming response
         return {
             "text": response.text,
             "model": response.model,
@@ -89,7 +124,6 @@ async def chat(request: ChatRequest):
 
 @router.get("/models")
 async def get_models():
-    """Get all available models across all providers"""
     try:
         models = ai_service.get_available_models()
         return {"providers": models}
@@ -99,7 +133,6 @@ async def get_models():
 
 @router.get("/models/{provider}")
 async def get_provider_models(provider: str):
-    """Get available models for a specific provider"""
     try:
         models = ai_service.get_provider_models(provider)
         return {
@@ -113,9 +146,19 @@ async def get_provider_models(provider: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ConfirmRequest(BaseModel):
+    approved: bool
+
+
+@router.post("/confirm/{command_id}")
+async def confirm_command(command_id: str, request: ConfirmRequest):
+    from backend.agents.confirmations import confirmation_manager
+    if command_id not in confirmation_manager.pending:
+        raise HTTPException(status_code=404, detail="Command confirmation request not found")
+    confirmation_manager.resolve(command_id, request.approved)
+    return {"status": "resolved", "approved": request.approved}
+
+
 @router.post("/completions")
-async def completions(request: ChatRequest):
-    """
-    Legacy completions endpoint (alias for /chat)
-    """
-    return await chat(request)
+async def completions(request: ChatRequest, http_request: Request):
+    return await chat(request, http_request)

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useUser } from "@clerk/tanstack-react-start";
+import { useAuthedFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -11,59 +12,54 @@ export const Route = createFileRoute("/_authenticated/admin")({
 type Profile = {
   id: string;
   display_name: string | null;
+  email: string | null;
   avatar_url: string | null;
-  role: "user" | "dev" | "admin" | "founder" | null;
+  role: "user" | "dev" | "admin" | "founder";
   created_at: string;
 };
 
 function AdminDashboard() {
+  const authedFetch = useAuthedFetch();
+  const { user } = useUser();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadUsers() {
+      if (!user) return;
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const profileRes = await authedFetch("/api/profile");
+        if (!profileRes.ok) return;
+        const profile = await profileRes.json();
+        setCurrentUserRole(profile.role || null);
 
-        // Get current user's role
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        setCurrentUserRole(profile?.role || null);
-
-        if (!["admin", "dev", "founder"].includes(profile?.role || "")) {
+        if (!["admin", "dev", "founder"].includes(profile.role || "")) {
           toast.error("Unauthorized: You don't have admin access");
           return;
         }
 
-        // Fetch all users
-        const response = await fetch("/api/admin/users");
+        const response = await authedFetch("/api/admin/users");
         if (response.ok) {
           const data = await response.json();
           setUsers(data);
         } else {
           toast.error("Failed to load users");
         }
-      } catch (error) {
+      } catch {
         toast.error("Error loading users");
       } finally {
         setLoading(false);
       }
     }
 
-    loadUsers();
-  }, []);
+    void loadUsers();
+  }, [user, authedFetch]);
 
   async function changeRole(userId: string, newRole: "user" | "dev" | "admin" | "founder") {
     try {
-      const response = await fetch("/api/admin/users", {
+      const response = await authedFetch("/api/admin/users", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, role: newRole }),
       });
 
@@ -71,10 +67,10 @@ function AdminDashboard() {
         setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
         toast.success("Role updated successfully");
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ message: "Failed" }));
         toast.error(error.message || "Failed to update role");
       }
-    } catch (error) {
+    } catch {
       toast.error("Error updating role");
     }
   }

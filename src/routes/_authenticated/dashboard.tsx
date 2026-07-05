@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useUser } from "@clerk/tanstack-react-start";
+import { useAuthedFetch } from "@/lib/api-fetch";
+import { useConversationsApi } from "@/lib/api";
 import { AppShell } from "@/components/bloomy/AppShell";
 import { Plus, MessageSquareText, Bot, FolderGit2, ArrowUpRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,32 +16,46 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useUser();
+  const authedFetch = useAuthedFetch();
+  const conversations = useConversationsApi();
   const [name, setName] = useState<string>("");
   const [counts, setCounts] = useState<{ chats: number; agents: number; projects: number } | null>(null);
   const [recent, setRecent] = useState<ConversationRow[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", u.user.id).maybeSingle();
-      setName(profile?.display_name ?? u.user.email?.split("@")[0] ?? "");
+      if (!user) return;
 
-      const [a, p] = await Promise.all([
-        supabase.from("agents").select("id", { count: "exact", head: true }),
-        supabase.from("projects").select("id", { count: "exact", head: true }),
-      ]);
+      try {
+        const profileRes = await authedFetch("/api/profile");
+        if (profileRes.ok) {
+          const p = await profileRes.json();
+          setName(p.display_name ?? user.primaryEmailAddress?.emailAddress?.split("@")[0] ?? "");
+        }
+      } catch {
+        // profile not yet created — fall back to email
+      }
 
-      const { data: convos } = await supabase
-        .from("conversations")
-        .select("id, title, created_at, updated_at, model")
-        .order("updated_at", { ascending: false });
+      try {
+        const statsRes = await authedFetch("/api/stats");
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          setCounts(stats);
+        }
+      } catch (err) {
+        console.error("[dashboard] stats failed", err);
+      }
 
-      const chatList = (convos ?? []) as ConversationRow[];
-      setCounts({ chats: chatList.length, agents: a.count ?? 0, projects: p.count ?? 0 });
-      setRecent(chatList.slice(0, 5));
+      try {
+        const convos = await conversations.list();
+        setCounts((c) => (c ? { ...c, chats: convos.length } : { chats: convos.length, agents: 0, projects: 0 }));
+        setRecent(convos.slice(0, 5));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to load chats");
+      }
     })();
-  }, []);
+  }, [user]);
 
   function newChat() {
     navigate({ to: "/chat" });

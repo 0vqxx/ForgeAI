@@ -17,9 +17,10 @@ import {
 import { ForgeLockup } from "./Logo";
 import { AmbientBackground } from "./AmbientBackground";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTheme, type Theme } from "@/components/ThemeProvider";
+import { useConversationsApi } from "@/lib/api";
+import type { ConversationRow } from "@/lib/api";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -28,7 +29,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
-import type { ConversationRow } from "@/lib/api";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; soon?: boolean };
 
@@ -47,6 +47,9 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const conversations = useConversationsApi();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [email, setEmail] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<ConversationRow[]>([]);
@@ -56,31 +59,30 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
 
   async function loadChats() {
     try {
-      const { data, error } = await supabase
-        .from("conversations")
-        .select("id, title, created_at, updated_at, model")
-        .order("updated_at", { ascending: false });
-      if (error || !data) return;
-      setRecentChats(data.slice(0, 8) as ConversationRow[]);
+      const data = await conversations.list();
+      setRecentChats(data.slice(0, 8));
     } catch {
       setRecentChats([]);
     }
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
+    setEmail(user?.primaryEmailAddress?.emailAddress ?? "");
+    setAvatarUrl(user?.imageUrl ?? null);
     loadChats();
-    function onRefresh() { loadChats(); }
+    function onRefresh() { void loadChats(); }
     window.addEventListener("forge:refresh-chats", onRefresh);
+    window.addEventListener("forge:avatar-updated", onRefresh);
     window.addEventListener("storage", onRefresh);
     return () => {
       window.removeEventListener("forge:refresh-chats", onRefresh);
+      window.removeEventListener("forge:avatar-updated", onRefresh);
       window.removeEventListener("storage", onRefresh);
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    loadChats();
+    void loadChats();
   }, [pathname]);
 
   useEffect(() => {
@@ -90,10 +92,10 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
     }
   }, [renamingId]);
 
-  async function signOut() {
+  async function signOutAndRedirect() {
     await queryClient.cancelQueries();
     queryClient.clear();
-    await supabase.auth.signOut();
+    await signOut();
     navigate({ to: "/auth", replace: true });
   }
 
@@ -101,7 +103,6 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
   // first message is sent. The `t` search param remounts the thread when already
   // on /chat so the "+" button always clears the current draft.
   function createNewChat() {
-    // Navigate to /chat with a UUID to force remount and clear state
     navigate({ to: "/chat", search: { t: crypto.randomUUID() } });
   }
 
@@ -116,12 +117,9 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
       return;
     }
     try {
-      await supabase
-        .from("conversations")
-        .update({ title: renameValue.trim() })
-        .eq("id", renamingId);
+      await conversations.update(renamingId, { title: renameValue.trim() });
       setRecentChats((prev) =>
-        prev.map((c) => (c.id === renamingId ? { ...c, title: renameValue.trim() } : c))
+        prev.map((c) => (c.id === renamingId ? { ...c, title: renameValue.trim() } : c)),
       );
     } catch {
       toast.error("Failed to rename");
@@ -133,7 +131,7 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
     const prev = recentChats;
     setRecentChats((chats) => chats.filter((c) => c.id !== id));
     try {
-      await supabase.from("conversations").delete().eq("id", id);
+      await conversations.remove(id);
       if (pathname === `/chat/${id}`) {
         navigate({ to: "/chat" });
       }
@@ -246,16 +244,18 @@ export function AppShell({ children, topRight }: { children: ReactNode; topRight
             <div className="elev-1 flex items-center gap-2 rounded-xl border border-border/60 bg-elevated/70 p-2">
               <button
                 onClick={() => {/* TODO: Open profile picture upload */}}
-                className="elev-1 grid h-8 w-8 shrink-0 place-items-center rounded-full forge-gradient-bg text-[12px] font-semibold text-white hover:opacity-80 transition-opacity"
+                className="elev-1 grid h-8 w-8 shrink-0 place-items-center rounded-full forge-gradient-bg text-[12px] font-semibold text-white hover:opacity-80 transition-opacity overflow-hidden"
                 title="Change profile picture"
               >
-                {(email || "?").slice(0, 1).toUpperCase()}
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+                ) : (email || "?").slice(0, 1).toUpperCase()}
               </button>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12px] font-medium text-foreground">{email || "Loading..."}</div>
                 <div className="text-[10px] uppercase tracking-wider text-text-muted">Forge account</div>
               </div>
-              <button onClick={signOut} title="Sign out" className="rounded-md p-1.5 text-text-muted hover:bg-muted hover:text-foreground">
+              <button onClick={signOutAndRedirect} title="Sign out" className="rounded-md p-1.5 text-text-muted hover:bg-muted hover:text-foreground">
                 <LogOut className="h-3.5 w-3.5" />
               </button>
             </div>

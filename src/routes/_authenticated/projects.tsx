@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuthedFetch } from "@/lib/api-fetch";
+import { useUser } from "@clerk/tanstack-react-start";
 import { AppShell } from "@/components/bloomy/AppShell";
 import { Plus, FolderGit2, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -21,22 +22,33 @@ const ACCENTS: { id: string; cls: string }[] = [
 ];
 
 function ProjectsPage() {
+  const authedFetch = useAuthedFetch();
   const [items, setItems] = useState<Project[] | null>(null);
   const [editing, setEditing] = useState<Project | "new" | null>(null);
 
   useEffect(() => { void load(); }, []);
 
   async function load() {
-    const { data, error } = await supabase.from("projects").select("id,name,description,accent,updated_at").order("updated_at", { ascending: false });
-    if (error) toast.error(error.message);
-    setItems(data ?? []);
+    try {
+      const res = await authedFetch("/api/projects");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setItems(data ?? []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load projects");
+      setItems([]);
+    }
   }
 
   async function remove(id: string) {
     const prev = items;
     setItems((items ?? []).filter((p) => p.id !== id));
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) { setItems(prev); toast.error(error.message); }
+    const res = await authedFetch(`/api/projects?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      setItems(prev ?? []);
+      const msg = await res.text().catch(() => "Failed");
+      toast.error(msg);
+    }
   }
 
   return (
@@ -98,6 +110,8 @@ function ProjectsPage() {
 }
 
 function ProjectEditor({ project, onClose, onSaved }: { project: Project | null; onClose: () => void; onSaved: () => void }) {
+  const authedFetch = useAuthedFetch();
+  const { user } = useUser();
   const [name, setName] = useState(project?.name ?? "");
   const [description, setDescription] = useState(project?.description ?? "");
   const [accent, setAccent] = useState(project?.accent ?? "bloom");
@@ -107,14 +121,19 @@ function ProjectEditor({ project, onClose, onSaved }: { project: Project | null;
     e.preventDefault();
     setBusy(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      if (!user) return;
       if (project) {
-        const { error } = await supabase.from("projects").update({ name, description, accent }).eq("id", project.id);
-        if (error) throw error;
+        const res = await authedFetch("/api/projects", {
+          method: "PATCH",
+          body: JSON.stringify({ id: project.id, name, description, accent }),
+        });
+        if (!res.ok) throw new Error(await res.text());
       } else {
-        const { error } = await supabase.from("projects").insert({ user_id: u.user.id, name, description, accent });
-        if (error) throw error;
+        const res = await authedFetch("/api/projects", {
+          method: "POST",
+          body: JSON.stringify({ name, description, accent }),
+        });
+        if (!res.ok) throw new Error(await res.text());
       }
       onSaved();
     } catch (err) {

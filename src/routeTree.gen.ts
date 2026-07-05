@@ -13,6 +13,11 @@ import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
+import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as ApiStatsRouteImport } from './routes/api/stats'
+import { Route as ApiProjectsRouteImport } from './routes/api/projects'
+import { Route as ApiProfileRouteImport } from './routes/api/profile'
 import { Route as ApiConversationsRouteImport } from './routes/api/conversations'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -20,12 +25,11 @@ import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiWebhooksClerkRouteImport } from './routes/api/webhooks/clerk'
 import { Route as ApiConversationsIdRouteImport } from './routes/api/conversations.$id'
 import { Route as ApiAdminUsersRouteImport } from './routes/api/admin/users'
 import { Route as AuthenticatedChatIdRouteImport } from './routes/_authenticated/chat.$id'
 import { Route as ApiConversationsIdMessagesRouteImport } from './routes/api/conversations.$id.messages'
-import { Route as ApiAuthCallbackGoogleRouteImport } from './routes/api/auth/callback/google'
-import { Route as ApiAuthCallbackDiscordRouteImport } from './routes/api/auth/callback/discord'
 
 const DownloadsRoute = DownloadsRouteImport.update({
   id: '/downloads',
@@ -44,6 +48,31 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpSplatRoute = SignUpSplatRouteImport.update({
+  id: '/sign-up/$',
+  path: '/sign-up/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInSplatRoute = SignInSplatRouteImport.update({
+  id: '/sign-in/$',
+  path: '/sign-in/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatsRoute = ApiStatsRouteImport.update({
+  id: '/api/stats',
+  path: '/api/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsRoute = ApiProjectsRouteImport.update({
+  id: '/api/projects',
+  path: '/api/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileRoute = ApiProfileRouteImport.update({
+  id: '/api/profile',
+  path: '/api/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiConversationsRoute = ApiConversationsRouteImport.update({
@@ -81,6 +110,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiWebhooksClerkRoute = ApiWebhooksClerkRouteImport.update({
+  id: '/api/webhooks/clerk',
+  path: '/api/webhooks/clerk',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiConversationsIdRoute = ApiConversationsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -102,16 +136,6 @@ const ApiConversationsIdMessagesRoute =
     path: '/messages',
     getParentRoute: () => ApiConversationsIdRoute,
   } as any)
-const ApiAuthCallbackGoogleRoute = ApiAuthCallbackGoogleRouteImport.update({
-  id: '/api/auth/callback/google',
-  path: '/api/auth/callback/google',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAuthCallbackDiscordRoute = ApiAuthCallbackDiscordRouteImport.update({
-  id: '/api/auth/callback/discord',
-  path: '/api/auth/callback/discord',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -124,11 +148,15 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/conversations': typeof ApiConversationsRouteWithChildren
+  '/api/profile': typeof ApiProfileRoute
+  '/api/projects': typeof ApiProjectsRoute
+  '/api/stats': typeof ApiStatsRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
   '/chat/$id': typeof AuthenticatedChatIdRoute
   '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/conversations/$id': typeof ApiConversationsIdRouteWithChildren
-  '/api/auth/callback/discord': typeof ApiAuthCallbackDiscordRoute
-  '/api/auth/callback/google': typeof ApiAuthCallbackGoogleRoute
+  '/api/webhooks/clerk': typeof ApiWebhooksClerkRoute
   '/api/conversations/$id/messages': typeof ApiConversationsIdMessagesRoute
 }
 export interface FileRoutesByTo {
@@ -142,11 +170,15 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/conversations': typeof ApiConversationsRouteWithChildren
+  '/api/profile': typeof ApiProfileRoute
+  '/api/projects': typeof ApiProjectsRoute
+  '/api/stats': typeof ApiStatsRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
   '/chat/$id': typeof AuthenticatedChatIdRoute
   '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/conversations/$id': typeof ApiConversationsIdRouteWithChildren
-  '/api/auth/callback/discord': typeof ApiAuthCallbackDiscordRoute
-  '/api/auth/callback/google': typeof ApiAuthCallbackGoogleRoute
+  '/api/webhooks/clerk': typeof ApiWebhooksClerkRoute
   '/api/conversations/$id/messages': typeof ApiConversationsIdMessagesRoute
 }
 export interface FileRoutesById {
@@ -162,11 +194,15 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/conversations': typeof ApiConversationsRouteWithChildren
+  '/api/profile': typeof ApiProfileRoute
+  '/api/projects': typeof ApiProjectsRoute
+  '/api/stats': typeof ApiStatsRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
   '/_authenticated/chat/$id': typeof AuthenticatedChatIdRoute
   '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/conversations/$id': typeof ApiConversationsIdRouteWithChildren
-  '/api/auth/callback/discord': typeof ApiAuthCallbackDiscordRoute
-  '/api/auth/callback/google': typeof ApiAuthCallbackGoogleRoute
+  '/api/webhooks/clerk': typeof ApiWebhooksClerkRoute
   '/api/conversations/$id/messages': typeof ApiConversationsIdMessagesRoute
 }
 export interface FileRouteTypes {
@@ -182,11 +218,15 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/chat'
     | '/api/conversations'
+    | '/api/profile'
+    | '/api/projects'
+    | '/api/stats'
+    | '/sign-in/$'
+    | '/sign-up/$'
     | '/chat/$id'
     | '/api/admin/users'
     | '/api/conversations/$id'
-    | '/api/auth/callback/discord'
-    | '/api/auth/callback/google'
+    | '/api/webhooks/clerk'
     | '/api/conversations/$id/messages'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -200,11 +240,15 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/chat'
     | '/api/conversations'
+    | '/api/profile'
+    | '/api/projects'
+    | '/api/stats'
+    | '/sign-in/$'
+    | '/sign-up/$'
     | '/chat/$id'
     | '/api/admin/users'
     | '/api/conversations/$id'
-    | '/api/auth/callback/discord'
-    | '/api/auth/callback/google'
+    | '/api/webhooks/clerk'
     | '/api/conversations/$id/messages'
   id:
     | '__root__'
@@ -219,11 +263,15 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/api/chat'
     | '/api/conversations'
+    | '/api/profile'
+    | '/api/projects'
+    | '/api/stats'
+    | '/sign-in/$'
+    | '/sign-up/$'
     | '/_authenticated/chat/$id'
     | '/api/admin/users'
     | '/api/conversations/$id'
-    | '/api/auth/callback/discord'
-    | '/api/auth/callback/google'
+    | '/api/webhooks/clerk'
     | '/api/conversations/$id/messages'
   fileRoutesById: FileRoutesById
 }
@@ -234,9 +282,13 @@ export interface RootRouteChildren {
   DownloadsRoute: typeof DownloadsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiConversationsRoute: typeof ApiConversationsRouteWithChildren
+  ApiProfileRoute: typeof ApiProfileRoute
+  ApiProjectsRoute: typeof ApiProjectsRoute
+  ApiStatsRoute: typeof ApiStatsRoute
+  SignInSplatRoute: typeof SignInSplatRoute
+  SignUpSplatRoute: typeof SignUpSplatRoute
   ApiAdminUsersRoute: typeof ApiAdminUsersRoute
-  ApiAuthCallbackDiscordRoute: typeof ApiAuthCallbackDiscordRoute
-  ApiAuthCallbackGoogleRoute: typeof ApiAuthCallbackGoogleRoute
+  ApiWebhooksClerkRoute: typeof ApiWebhooksClerkRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -267,6 +319,41 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up/$': {
+      id: '/sign-up/$'
+      path: '/sign-up/$'
+      fullPath: '/sign-up/$'
+      preLoaderRoute: typeof SignUpSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in/$': {
+      id: '/sign-in/$'
+      path: '/sign-in/$'
+      fullPath: '/sign-in/$'
+      preLoaderRoute: typeof SignInSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stats': {
+      id: '/api/stats'
+      path: '/api/stats'
+      fullPath: '/api/stats'
+      preLoaderRoute: typeof ApiStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects': {
+      id: '/api/projects'
+      path: '/api/projects'
+      fullPath: '/api/projects'
+      preLoaderRoute: typeof ApiProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile': {
+      id: '/api/profile'
+      path: '/api/profile'
+      fullPath: '/api/profile'
+      preLoaderRoute: typeof ApiProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/conversations': {
@@ -318,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/webhooks/clerk': {
+      id: '/api/webhooks/clerk'
+      path: '/api/webhooks/clerk'
+      fullPath: '/api/webhooks/clerk'
+      preLoaderRoute: typeof ApiWebhooksClerkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/conversations/$id': {
       id: '/api/conversations/$id'
       path: '/$id'
@@ -345,20 +439,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/conversations/$id/messages'
       preLoaderRoute: typeof ApiConversationsIdMessagesRouteImport
       parentRoute: typeof ApiConversationsIdRoute
-    }
-    '/api/auth/callback/google': {
-      id: '/api/auth/callback/google'
-      path: '/api/auth/callback/google'
-      fullPath: '/api/auth/callback/google'
-      preLoaderRoute: typeof ApiAuthCallbackGoogleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/auth/callback/discord': {
-      id: '/api/auth/callback/discord'
-      path: '/api/auth/callback/discord'
-      fullPath: '/api/auth/callback/discord'
-      preLoaderRoute: typeof ApiAuthCallbackDiscordRouteImport
-      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -422,20 +502,14 @@ const rootRouteChildren: RootRouteChildren = {
   DownloadsRoute: DownloadsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiConversationsRoute: ApiConversationsRouteWithChildren,
+  ApiProfileRoute: ApiProfileRoute,
+  ApiProjectsRoute: ApiProjectsRoute,
+  ApiStatsRoute: ApiStatsRoute,
+  SignInSplatRoute: SignInSplatRoute,
+  SignUpSplatRoute: SignUpSplatRoute,
   ApiAdminUsersRoute: ApiAdminUsersRoute,
-  ApiAuthCallbackDiscordRoute: ApiAuthCallbackDiscordRoute,
-  ApiAuthCallbackGoogleRoute: ApiAuthCallbackGoogleRoute,
+  ApiWebhooksClerkRoute: ApiWebhooksClerkRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

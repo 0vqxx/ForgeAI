@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getAuthContext } from "@/lib/api-auth";
+import { sql } from "@/lib/db";
 
 export const Route = createFileRoute("/api/conversations/$id")({
   server: {
@@ -8,29 +9,23 @@ export const Route = createFileRoute("/api/conversations/$id")({
         const auth = await getAuthContext(request);
         if (!auth.ok) return auth.response;
 
-        const { data, error } = await auth.supabase
-          .from("conversations")
-          .select("id, title, created_at, updated_at, model")
-          .eq("id", params.id)
-          .eq("user_id", auth.userId)
-          .single();
-
-        if (error) {
-          const status = error.code === "PGRST116" ? 404 : 500;
-          return Response.json({ message: error.message }, { status });
+        const conv = await sql`
+          SELECT id, user_id, title, project_id, agent_id, model, created_at, updated_at
+          FROM conversations
+          WHERE id = ${params.id} AND user_id = ${auth.userId}
+        `;
+        if (conv.length === 0) {
+          return Response.json({ message: "Not found" }, { status: 404 });
         }
 
-        const { data: messages, error: msgError } = await auth.supabase
-          .from("messages")
-          .select("id, role, content, created_at")
-          .eq("conversation_id", params.id)
-          .order("created_at", { ascending: true });
+        const messages = await sql`
+          SELECT id, conversation_id, user_id, role, content, created_at
+          FROM messages
+          WHERE conversation_id = ${params.id}
+          ORDER BY created_at ASC
+        `;
 
-        if (msgError) {
-          return Response.json({ message: msgError.message }, { status: 500 });
-        }
-
-        return Response.json({ ...data, messages: messages ?? [] });
+        return Response.json({ ...conv[0], messages });
       },
 
       PATCH: async ({ request, params }) => {
@@ -38,43 +33,38 @@ export const Route = createFileRoute("/api/conversations/$id")({
         if (!auth.ok) return auth.response;
 
         const body = await request.json().catch(() => ({}));
-        const updates: { title?: string; model?: string } = {};
-        if (typeof body.title === "string") updates.title = body.title;
-        if (typeof body.model === "string") updates.model = body.model;
+        const { title, model } = body as { title?: string; model?: string };
 
-        if (Object.keys(updates).length === 0) {
+        if (typeof title !== "string" && typeof model !== "string") {
           return Response.json({ message: "no fields to update" }, { status: 400 });
         }
 
-        const { data, error } = await auth.supabase
-          .from("conversations")
-          .update(updates)
-          .eq("id", params.id)
-          .eq("user_id", auth.userId)
-          .select("id, title, created_at, updated_at, model")
-          .single();
+        const rows = await sql`
+          UPDATE conversations
+          SET ${title !== undefined ? sql`title = ${title}` : sql``}
+              ${title !== undefined && model !== undefined ? sql`, ` : sql``}
+              ${model !== undefined ? sql`model = ${model}` : sql``},
+              updated_at = now()
+          WHERE id = ${params.id} AND user_id = ${auth.userId}
+          RETURNING id, user_id, title, project_id, agent_id, model, created_at, updated_at
+        `;
 
-        if (error) {
-          return Response.json({ message: error.message }, { status: 500 });
+        if (rows.length === 0) {
+          return Response.json({ message: "Not found or no permission" }, { status: 404 });
         }
-
-        return Response.json(data);
+        return Response.json(rows[0]);
       },
 
       DELETE: async ({ request, params }) => {
         const auth = await getAuthContext(request);
         if (!auth.ok) return auth.response;
 
-        const { error } = await auth.supabase
-          .from("conversations")
-          .delete()
-          .eq("id", params.id)
-          .eq("user_id", auth.userId);
-
-        if (error) {
-          return Response.json({ message: error.message }, { status: 500 });
+        const result = await sql`
+          DELETE FROM conversations WHERE id = ${params.id} AND user_id = ${auth.userId}
+        `;
+        if (result.count === 0) {
+          return Response.json({ message: "Not found or no permission" }, { status: 404 });
         }
-
         return new Response(null, { status: 204 });
       },
     },

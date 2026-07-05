@@ -5,7 +5,8 @@ import { ModelSelector } from "@/components/bloomy/ModelSelector";
 import { nvidiaAI, type NvidiaModel } from "@/integrations/nvidia";
 import { ArrowUp, Loader2, Paperclip, X, Download } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@clerk/tanstack-react-start";
+import { useConversationsApi } from "@/lib/api";
 
 interface ChatMessage {
   id: string;
@@ -66,6 +67,8 @@ function getGreeting() {
 }
 
 export function ChatThread({ id }: { id: string }) {
+  const { isSignedIn } = useAuth();
+  const conversations = useConversationsApi();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [greeting] = useState(() => getGreeting());
   const [title, setTitle] = useState("New chat");
@@ -111,48 +114,28 @@ export function ChatThread({ id }: { id: string }) {
     URL.revokeObjectURL(url);
   }
 
-  // Load existing conversation directly from Supabase
+  // Load existing conversation from the /api/conversations endpoint
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      // Wait for auth session to be restored from storage before querying
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!isSignedIn) {
         if (!cancelled) setLoading(false);
         return;
       }
 
-      const { data: convo, error: convoErr } = await supabase
-        .from("conversations")
-        .select("id, title, model")
-        .eq("id", id)
-        .single();
+      try {
+        const convo = await conversations.get(id);
+        if (cancelled) return;
 
-      if (cancelled) return;
+        isNew.current = false;
+        convoId.current = convo.id;
+        titleRef.current = convo.title ?? "New chat";
+        setTitle(convo.title ?? "New chat");
+        if (convo.model) setModel(convo.model as NvidiaModel);
 
-      if (convoErr || !convo) {
-        // Conversation not found or access denied — treat as new
-        isNew.current = true;
-        convoId.current = id;
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      isNew.current = false;
-      convoId.current = convo.id;
-      titleRef.current = convo.title ?? "New chat";
-      setTitle(convo.title ?? "New chat");
-      if (convo.model) setModel(convo.model as NvidiaModel);
-
-      const { data: messages } = await supabase
-        .from("messages")
-        .select("id, role, content, created_at")
-        .eq("conversation_id", id)
-        .order("created_at", { ascending: true });
-
-      if (!cancelled) {
-        if (messages && messages.length > 0) {
+        const messages = convo.messages ?? [];
+        if (messages.length > 0) {
           const loaded: ChatMessage[] = messages.map((m) => ({
             id: m.id,
             role: m.role as "user" | "assistant" | "system",
@@ -162,16 +145,19 @@ export function ChatThread({ id }: { id: string }) {
           msgsRef.current = loaded;
           setMsgs(loaded);
         }
-        setLoading(false);
+        if (!cancelled) setLoading(false);
+      } catch {
+        // 404 means not found / no access — treat as new
+        isNew.current = true;
+        convoId.current = id;
+        if (!cancelled) setLoading(false);
       }
     }
 
-    load().catch(() => {
-      if (!cancelled) setLoading(false);
-    });
+    void load();
 
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, isSignedIn]);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
@@ -184,49 +170,35 @@ export function ChatThread({ id }: { id: string }) {
   async function getOrCreateConvoId(titleForNew: string): Promise<string | null> {
     if (!isNew.current) return convoId.current;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!isSignedIn) {
       toast.error("You're not signed in.");
       return null;
     }
 
-    const { data, error } = await supabase
-      .from("conversations")
-      .insert({
-        id: convoId.current,
-        user_id: user.id,
-        title: titleForNew,
-        model,
-      })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      console.error("[ChatThread] Failed to create conversation:", error);
+    try {
+      const created = await conversations.create(titleForNew, model);
+      if (!created?.id) {
+        toast.error("Failed to create conversation. Please try again.");
+        return null;
+      }
+      convoId.current = created.id;
+      isNew.current = false;
+      return created.id;
+    } catch (err) {
+      console.error("[ChatThread] Failed to create conversation:", err);
       toast.error("Failed to create conversation. Please try again.");
       return null;
     }
-
-    convoId.current = data.id;
-    isNew.current = false;
-    return data.id;
   }
 
   async function saveMessage(conversationId: string, role: "user" | "assistant", content: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const { data, error } = await supabase
-      .from("messages")
-      .insert({ conversation_id: conversationId, user_id: user.id, role, content })
-      .select("id, role, content, created_at")
-      .single();
-
-    if (error) {
-      console.error("[ChatThread] Failed to save message:", error);
+    try {
+      const created = await conversations.addMessage(conversationId, role, content);
+      return created;
+    } catch (err) {
+      console.error("[ChatThread] Failed to save message:", err);
       return null;
     }
-    return data;
   }
 
   async function send(e: React.FormEvent, promptText?: string) {
@@ -246,7 +218,11 @@ export function ChatThread({ id }: { id: string }) {
     if (t !== titleRef.current) {
       titleRef.current = t;
       setTitle(t);
-      await supabase.from("conversations").update({ title: t }).eq("id", apiId);
+      try {
+        await conversations.update(apiId, { title: t });
+      } catch (err) {
+        console.error("[ChatThread] Failed to update title:", err);
+      }
     }
 
     // Save user message
@@ -437,7 +413,7 @@ export function ChatThread({ id }: { id: string }) {
 
 /** Render markdown-like content with code blocks */
 function renderMessage(content: string) {
-  const elements: JSX.Element[] = [];
+  const elements: React.ReactNode[] = [];
   const codeRegex = /```([\s\S]*?)```/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -468,13 +444,17 @@ function renderMessage(content: string) {
   return elements;
 }
 
-function renderTextBlock(txt: string, startIdx: number): JSX.Element[] {
+function renderTextBlock(txt: string, startIdx: number): React.JSX.Element[] {
   return txt.split("\n").map((line, i) => {
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
-      const level = heading[1].length as 1 | 2 | 3 | 4 | 5 | 6;
-      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
-      return <Tag key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</Tag>;
+      const level = heading[1].length;
+      if (level === 1) return <h1 key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</h1>;
+      if (level === 2) return <h2 key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</h2>;
+      if (level === 3) return <h3 key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</h3>;
+      if (level === 4) return <h4 key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</h4>;
+      if (level === 5) return <h5 key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</h5>;
+      return <h6 key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</h6>;
     }
     return <p key={`${startIdx}-${i}`} className="whitespace-pre-wrap">{line}</p>;
   });

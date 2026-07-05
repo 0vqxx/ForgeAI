@@ -1,3 +1,21 @@
+# Secrets / env
+.env
+.env.local
+*.local
+backend/.env
+
+# Neon / migration tooling (contains live DB connection strings)
+neon/
+
+# Clerk API dump
+clerk-config.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
 # Logs
 logs
 *.log
@@ -7,6 +25,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies / build
 node_modules
 dist
 dist-ssr
@@ -14,14 +33,8 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
-*.local
-.env
 
-# Wrangler / Cloudflare
-.wrangler/
-.dev.vars
-
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -31,3 +44,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars

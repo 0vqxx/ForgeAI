@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getAuthContext } from "@/lib/api-auth";
+import { sql } from "@/lib/db";
 
 export const Route = createFileRoute("/api/conversations/$id/messages")({
   server: {
@@ -8,26 +9,18 @@ export const Route = createFileRoute("/api/conversations/$id/messages")({
         const auth = await getAuthContext(request);
         if (!auth.ok) return auth.response;
 
-        const { data, error } = await auth.supabase
-          .from("messages")
-          .select("id, role, content, created_at")
-          .eq("conversation_id", params.id)
-          .order("created_at", { ascending: true });
-
-        if (error) {
-          return Response.json({ message: error.message }, { status: 500 });
-        }
-
-        return Response.json(data ?? []);
+        const rows = await sql`
+          SELECT id, conversation_id, user_id, role, content, created_at
+          FROM messages
+          WHERE conversation_id = ${params.id} AND user_id = ${auth.userId}
+          ORDER BY created_at ASC
+        `;
+        return Response.json(rows);
       },
 
       POST: async ({ request, params }) => {
-        console.log("[API] POST /api/conversations/$id/messages");
         const auth = await getAuthContext(request);
-        if (!auth.ok) {
-          console.error("[API] Auth failed");
-          return auth.response;
-        }
+        if (!auth.ok) return auth.response;
 
         const body = await request.json().catch(() => ({}));
         const { role, content } = body as { role?: string; content?: string };
@@ -35,29 +28,23 @@ export const Route = createFileRoute("/api/conversations/$id/messages")({
         if (!role || !content) {
           return Response.json({ message: "role and content are required" }, { status: 400 });
         }
-
         if (!["user", "assistant", "system"].includes(role)) {
           return Response.json({ message: "role must be user, assistant, or system" }, { status: 400 });
         }
 
-        const { data, error } = await auth.supabase
-          .from("messages")
-          .insert({
-            conversation_id: params.id,
-            user_id: auth.userId,
-            role,
-            content,
-          })
-          .select("id, role, content, created_at")
-          .single();
-
-        if (error) {
-          console.error("[API] Database error:", error);
-          return Response.json({ message: error.message }, { status: 500 });
+        const convs = await sql`
+          SELECT id FROM conversations WHERE id = ${params.id} AND user_id = ${auth.userId}
+        `;
+        if (convs.length === 0) {
+          return Response.json({ message: "Conversation not found" }, { status: 404 });
         }
 
-        console.log("[API] Created message:", data.id);
-        return Response.json(data, { status: 201 });
+        const rows = await sql`
+          INSERT INTO messages (conversation_id, user_id, role, content)
+          VALUES (${params.id}, ${auth.userId}, ${role}, ${content})
+          RETURNING id, conversation_id, user_id, role, content, created_at
+        `;
+        return Response.json(rows[0], { status: 201 });
       },
     },
   },

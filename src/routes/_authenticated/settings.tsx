@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth, useUser } from "@clerk/tanstack-react-start";
+import { useAuthedFetch } from "@/lib/api-fetch";
 import { AppShell } from "@/components/bloomy/AppShell";
 import { Camera, Check, Loader2, Moon, Palette, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +14,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { user } = useUser();
+  const authedFetch = useAuthedFetch();
   const [loaded, setLoaded] = useState(false);
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
@@ -25,27 +28,35 @@ function SettingsPage() {
 
   useEffect(() => {
     void (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      setEmail(u.user.email ?? "");
-      setUserId(u.user.id);
-      setCreatedAt(u.user.created_at ?? null);
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_url")
-        .eq("id", u.user.id)
-        .maybeSingle();
-      setDisplayName(p?.display_name ?? "");
-      setAvatarUrl(p?.avatar_url ?? null);
+      if (!user) return;
+      setEmail(user.primaryEmailAddress?.emailAddress ?? "");
+      setUserId(user.id);
+      setCreatedAt(user.createdAt ? new Date(user.createdAt).toISOString() : null);
+      setAvatarUrl(user.imageUrl ?? null);
+      try {
+        const res = await authedFetch("/api/profile");
+        if (res.ok) {
+          const p = await res.json();
+          setDisplayName(p.display_name ?? "");
+          if (p.avatar_url) setAvatarUrl(p.avatar_url);
+        } else {
+          // Profile row missing — create it lazily
+          await authedFetch("/api/profile", {
+            method: "PATCH",
+            body: JSON.stringify({ display_name: "" }),
+          });
+        }
+      } catch {
+        // ignore — display name just stays empty
+      }
       setLoaded(true);
     })();
-  }, []);
+  }, [user, authedFetch]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !userId) return;
 
-    // Validate size (5 MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image must be under 5 MB.");
       return;
@@ -53,38 +64,30 @@ function SettingsPage() {
 
     setUploadingAvatar(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${userId}/avatar.${ext}`;
+      // Upload avatar via the profile API (multipart-aware endpoint would be ideal;
+      // for now we base64-encode and store as a data URL in the profile row).
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Could not read image"));
+        reader.readAsDataURL(file);
+      });
 
-      // Upload to Supabase Storage (upsert so re-uploads overwrite)
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
+      const res = await authedFetch("/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ avatar_url: dataUrl }),
+      });
+      if (!res.ok) throw new Error("Failed to save avatar");
 
-      if (uploadError) throw uploadError;
-
-      // Get the public URL
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-      // Bust the cache by appending a timestamp
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      // Save the URL to the profiles table
-      const { error: dbError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", userId);
-
-      if (dbError) throw dbError;
-
-      setAvatarUrl(publicUrl);
-      // Notify the sidebar to refresh
+      const updated = await res.json();
+      const nextUrl = `${updated.avatar_url}?t=${Date.now()}`;
+      setAvatarUrl(nextUrl);
       window.dispatchEvent(new Event("forge:avatar-updated"));
       toast.success("Profile picture updated.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setUploadingAvatar(false);
-      // Reset the input so the same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -93,21 +96,11 @@ function SettingsPage() {
     if (!userId) return;
     setUploadingAvatar(true);
     try {
-      // Remove all files in the user's avatar folder
-      const { data: files } = await supabase.storage.from("avatars").list(userId);
-      if (files && files.length > 0) {
-        await supabase.storage
-          .from("avatars")
-          .remove(files.map((f) => `${userId}/${f.name}`));
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ avatar_url: null })
-        .eq("id", userId);
-
-      if (error) throw error;
-
+      const res = await authedFetch("/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ avatar_url: null }),
+      });
+      if (!res.ok) throw new Error("Failed to remove avatar");
       setAvatarUrl(null);
       window.dispatchEvent(new Event("forge:avatar-updated"));
       toast.success("Profile picture removed.");
@@ -122,13 +115,11 @@ function SettingsPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const { error } = await supabase
-        .from("profiles")
-        .update({ display_name: displayName })
-        .eq("id", u.user.id);
-      if (error) throw error;
+      const res = await authedFetch("/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ display_name: displayName }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
       toast.success("Saved.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");

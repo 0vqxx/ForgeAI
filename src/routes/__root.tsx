@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/tanstack-react-start";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -10,7 +11,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
@@ -107,8 +108,10 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
-        <Scripts />
+        <ClerkProvider>
+          {children}
+          <Scripts />
+        </ClerkProvider>
       </body>
     </html>
   );
@@ -117,15 +120,13 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [router, queryClient]);
+    if (!isLoaded) return;
+    router.invalidate();
+    if (isSignedIn) queryClient.invalidateQueries();
+  }, [isSignedIn, isLoaded, router, queryClient]);
 
   return (
     <ThemeProvider>
