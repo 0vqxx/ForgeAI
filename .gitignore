@@ -48,3 +48,6 @@ dist-ssr
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+
+# clerk configuration (can include secrets)
+/.clerk/

@@ -26,8 +26,8 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated/chat.index'
 import { Route as ApiWebhooksClerkRouteImport } from './routes/api/webhooks/clerk'
 import { Route as ApiConversationsIdRouteImport } from './routes/api/conversations.$id'
 import { Route as ApiAdminUsersRouteImport } from './routes/api/admin/users'
@@ -118,14 +118,14 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedChatIndexRoute = AuthenticatedChatIndexRouteImport.update({
+  id: '/chat/',
+  path: '/chat/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiWebhooksClerkRoute = ApiWebhooksClerkRouteImport.update({
@@ -144,9 +144,9 @@ const ApiAdminUsersRoute = ApiAdminUsersRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedChatIdRoute = AuthenticatedChatIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthenticatedChatRoute,
+  id: '/chat/$id',
+  path: '/chat/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiConversationsIdMessagesRoute =
   ApiConversationsIdMessagesRouteImport.update({
@@ -161,7 +161,6 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof DownloadsRoute
   '/sign-up': typeof SignUpRouteWithChildren
   '/admin': typeof AuthenticatedAdminRoute
-  '/chat': typeof AuthenticatedChatRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -178,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/conversations/$id': typeof ApiConversationsIdRouteWithChildren
   '/api/webhooks/clerk': typeof ApiWebhooksClerkRoute
+  '/chat/': typeof AuthenticatedChatIndexRoute
   '/api/conversations/$id/messages': typeof ApiConversationsIdMessagesRoute
 }
 export interface FileRoutesByTo {
@@ -186,7 +186,6 @@ export interface FileRoutesByTo {
   '/downloads': typeof DownloadsRoute
   '/sign-up': typeof SignUpRouteWithChildren
   '/admin': typeof AuthenticatedAdminRoute
-  '/chat': typeof AuthenticatedChatRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -203,6 +202,7 @@ export interface FileRoutesByTo {
   '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/conversations/$id': typeof ApiConversationsIdRouteWithChildren
   '/api/webhooks/clerk': typeof ApiWebhooksClerkRoute
+  '/chat': typeof AuthenticatedChatIndexRoute
   '/api/conversations/$id/messages': typeof ApiConversationsIdMessagesRoute
 }
 export interface FileRoutesById {
@@ -213,7 +213,6 @@ export interface FileRoutesById {
   '/downloads': typeof DownloadsRoute
   '/sign-up': typeof SignUpRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
-  '/_authenticated/chat': typeof AuthenticatedChatRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -230,6 +229,7 @@ export interface FileRoutesById {
   '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/conversations/$id': typeof ApiConversationsIdRouteWithChildren
   '/api/webhooks/clerk': typeof ApiWebhooksClerkRoute
+  '/_authenticated/chat/': typeof AuthenticatedChatIndexRoute
   '/api/conversations/$id/messages': typeof ApiConversationsIdMessagesRoute
 }
 export interface FileRouteTypes {
@@ -240,7 +240,6 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/sign-up'
     | '/admin'
-    | '/chat'
     | '/dashboard'
     | '/projects'
     | '/settings'
@@ -257,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/admin/users'
     | '/api/conversations/$id'
     | '/api/webhooks/clerk'
+    | '/chat/'
     | '/api/conversations/$id/messages'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -265,7 +265,6 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/sign-up'
     | '/admin'
-    | '/chat'
     | '/dashboard'
     | '/projects'
     | '/settings'
@@ -282,6 +281,7 @@ export interface FileRouteTypes {
     | '/api/admin/users'
     | '/api/conversations/$id'
     | '/api/webhooks/clerk'
+    | '/chat'
     | '/api/conversations/$id/messages'
   id:
     | '__root__'
@@ -291,7 +291,6 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/sign-up'
     | '/_authenticated/admin'
-    | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/projects'
     | '/_authenticated/settings'
@@ -308,6 +307,7 @@ export interface FileRouteTypes {
     | '/api/admin/users'
     | '/api/conversations/$id'
     | '/api/webhooks/clerk'
+    | '/_authenticated/chat/'
     | '/api/conversations/$id/messages'
   fileRoutesById: FileRoutesById
 }
@@ -449,18 +449,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/chat': {
-      id: '/_authenticated/chat'
-      path: '/chat'
-      fullPath: '/chat'
-      preLoaderRoute: typeof AuthenticatedChatRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/chat/': {
+      id: '/_authenticated/chat/'
+      path: '/chat'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof AuthenticatedChatIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/webhooks/clerk': {
@@ -486,10 +486,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/chat/$id': {
       id: '/_authenticated/chat/$id'
-      path: '/$id'
+      path: '/chat/$id'
       fullPath: '/chat/$id'
       preLoaderRoute: typeof AuthenticatedChatIdRouteImport
-      parentRoute: typeof AuthenticatedChatRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/conversations/$id/messages': {
       id: '/api/conversations/$id/messages'
@@ -501,31 +501,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedChatRouteChildren {
-  AuthenticatedChatIdRoute: typeof AuthenticatedChatIdRoute
-}
-
-const AuthenticatedChatRouteChildren: AuthenticatedChatRouteChildren = {
-  AuthenticatedChatIdRoute: AuthenticatedChatIdRoute,
-}
-
-const AuthenticatedChatRouteWithChildren =
-  AuthenticatedChatRoute._addFileChildren(AuthenticatedChatRouteChildren)
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
-  AuthenticatedChatRoute: typeof AuthenticatedChatRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedChatIdRoute: typeof AuthenticatedChatIdRoute
+  AuthenticatedChatIndexRoute: typeof AuthenticatedChatIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
-  AuthenticatedChatRoute: AuthenticatedChatRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedChatIdRoute: AuthenticatedChatIdRoute,
+  AuthenticatedChatIndexRoute: AuthenticatedChatIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
