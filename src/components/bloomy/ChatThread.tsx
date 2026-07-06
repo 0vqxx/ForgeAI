@@ -349,7 +349,7 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
   }
 
   function extractDownloadUrl(content: string): string | null {
-    const match = content.match(/\/api\/downloads\/[a-zA-Z0-9_-]+\/[^.\s]+\.zip/);
+    const match = content.match(/\/api\/downloads\/[^\/\s\)]+\/[^\/\s\)]+\.zip/);
     return match ? match[0] : null;
   }
 
@@ -583,23 +583,11 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
             <div className="mx-auto max-w-3xl space-y-6">
               {msgs.map((m) => (
                 <div key={m.id}>
-                  <Bubble role={m.role}>{m.content}</Bubble>
-                  {m.role === "assistant" && (() => {
-                    const downloadUrl = extractDownloadUrl(m.content);
-                    if (downloadUrl) {
-                      return (
-                        <a
-                          href={downloadUrl}
-                          download
-                          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
-                        >
-                          <Download className="h-3 w-3" />
-                          Download file
-                        </a>
-                      );
-                    }
-                    return null;
-                  })()}
+                  {m.role === "assistant" ? (
+                    <ContentWithTools content={m.content} />
+                  ) : (
+                    <div className="prose prose-invert max-w-none">{m.content}</div>
+                  )}
                 </div>
               ))}
               {streaming && (
