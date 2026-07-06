@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/bloomy/AppShell";
 import { ForgeMark } from "@/components/bloomy/Logo";
 import { ModelSelector } from "@/components/bloomy/ModelSelector";
@@ -68,6 +69,7 @@ function getGreeting() {
 
 export function ChatThread({ id }: { id: string }) {
   const { isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const conversations = useConversationsApi();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [greeting] = useState(() => getGreeting());
@@ -211,8 +213,16 @@ export function ChatThread({ id }: { id: string }) {
       ? (text.length > 30 ? text.slice(0, 27) + "..." : text)
       : titleRef.current;
 
+    const wasNew = isNew.current;
     const apiId = await getOrCreateConvoId(t);
     if (!apiId) return;
+
+    if (wasNew) {
+      // Force the URL to update so refreshes will load this chat, 
+      // but without a full reload or remount that interrupts streaming.
+      // setTimeout avoids race conditions with TanStack router mounting.
+      setTimeout(() => navigate({ to: "/chat/$id", params: { id: apiId }, replace: true }), 0);
+    }
 
     // Update title if needed
     if (t !== titleRef.current) {
