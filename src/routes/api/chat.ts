@@ -19,14 +19,21 @@ export const Route = createFileRoute("/api/chat")({
         const modelId = typeof body.model === "string" && body.model ? body.model : "moonshotai/kimi-k2.6";
         const system = typeof body.system === "string" && body.system.trim() ? body.system : undefined;
 
+        const authHeader = request.headers.get("authorization");
+
         const proxyUrl = process.env.NVIDIA_PROXY_URL || "https://ghostdetector2-forge-api-proxy.hf.space/api/ai/chat";
 
         try {
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (authHeader) {
+            headers["Authorization"] = authHeader;
+          }
+
           const response = await fetch(proxyUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers,
             body: JSON.stringify({
               messages: body.messages,
               model: modelId,

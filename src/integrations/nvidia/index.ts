@@ -49,11 +49,19 @@ export class NvidiaAI {
   }
 
   async chat(messages: Array<{ role: string; content: string }>, model: NvidiaModel = "moonshotai/kimi-k2.6"): Promise<string> {
+    // @ts-ignore
+    const token = await window.Clerk?.session?.getToken();
+    
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch("/api/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         messages,
         model,
@@ -74,11 +82,19 @@ export class NvidiaAI {
     model: NvidiaModel = "moonshotai/kimi-k2.6",
     onChunk: (chunk: string) => void
   ): Promise<string> {
+    // @ts-ignore
+    const token = await window.Clerk?.session?.getToken();
+    
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch("/api/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         messages,
         model,
