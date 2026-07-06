@@ -7,6 +7,7 @@ import { nvidiaAI, type NvidiaModel } from "@/integrations/nvidia";
 import { ArrowUp, Loader2, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/tanstack-react-start";
+import { useConversationsApi } from "@/lib/api";
 import { MarkdownMessage } from "@/components/bloomy/MarkdownMessage";
 import { ThinkingBlock } from "@/components/bloomy/ThinkingBlock";
 import { ContentWithTools } from "@/components/bloomy/ToolBlock";
