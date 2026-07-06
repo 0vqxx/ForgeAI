@@ -225,11 +225,29 @@ async def run_agent_loop(messages: list, model: str, provider_str: str, user_id:
                 "args": args
             })
             
+        assistant_message_content = "".join(content_buffer)
+        
+        # Fallback for text-based XML tool calls
+        if not tool_calls and "<tool_call>" in assistant_message_content:
+            import re
+            import uuid
+            matches = re.finditer(r"<tool_call>\s*({.*?})\s*</tool_call>", assistant_message_content, re.DOTALL)
+            for m in matches:
+                try:
+                    tc_data = json.loads(m.group(1))
+                    if "name" in tc_data:
+                        tool_calls.append({
+                            "id": "call_" + str(uuid.uuid4())[:8],
+                            "name": tc_data["name"],
+                            "args": tc_data.get("args", tc_data.get("arguments", {}))
+                        })
+                except Exception:
+                    pass
+            
         if not tool_calls:
             break
             
         # Add assistant message with tool calls to conversation history
-        assistant_message_content = "".join(content_buffer)
         current_messages.append({
             "role": "assistant",
             "content": assistant_message_content,

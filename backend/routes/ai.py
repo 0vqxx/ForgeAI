@@ -55,9 +55,19 @@ async def chat(request: ChatRequest, http_request: Request):
                 "- write_workspace_file: Write or modify files (restricted from the 'backend' directory).\n"
                 "- execute_command: Run terminal commands like builds or tests (restricted from targeting 'backend').\n"
                 "- web_search: Perform web search for documentation and facts.\n"
-                "- create_zip_archive: Bundle multiple files/folders into a downloadable zip file (places it under /api/downloads/). Use this to give the user zip files of code deliverables.\n"
-                "Always use these tools to research, write, build, verify, and package your code."
+                "- list_workspace_directory: Lists contents of a directory.\n"
+                "- create_zip_archive: Bundle multiple files/folders into a downloadable zip file (places it under /api/downloads/).\n"
+                "Always use these tools to research, write, build, verify, and package your code.\n"
             )
+            if request.provider == "nvidia":
+                tool_instructions += (
+                    "\nIMPORTANT: Your current endpoint does NOT support native function calling. "
+                    "To use a tool, you MUST output a JSON block wrapped in <tool_call> tags exactly like this:\n"
+                    "<tool_call>\n"
+                    "{\"name\": \"execute_command\", \"arguments\": {\"command\": \"ls -la\"}}\n"
+                    "</tool_call>\n"
+                    "You may output multiple <tool_call> blocks. Do NOT use markdown code blocks for tool calls, ONLY use <tool_call>!"
+                )
             if system_msg_idx is not None:
                 messages[system_msg_idx]["content"] += tool_instructions
             else:
