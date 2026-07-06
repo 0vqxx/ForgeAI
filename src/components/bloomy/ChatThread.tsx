@@ -4,7 +4,7 @@ import { AppShell } from "@/components/bloomy/AppShell";
 import { ForgeMark } from "@/components/bloomy/Logo";
 import { ModelSelector } from "@/components/bloomy/ModelSelector";
 import { nvidiaAI, type NvidiaModel } from "@/integrations/nvidia";
-import { ArrowUp, Loader2, Paperclip, X } from "lucide-react";
+import { ArrowUp, Loader2, Paperclip, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { useConversationsApi } from "@/lib/api";
@@ -117,23 +117,9 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function generateZipFromCode(content: string) {
-    const codeRegex = /```(\w+)?\n([\s\S]*?)```/g;
-    const files: { name: string; content: string }[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = codeRegex.exec(content)) !== null) {
-      const lang = match[1] || "txt";
-      files.push({ name: `code_${files.length + 1}.${lang}`, content: match[2] });
-    }
-    if (files.length === 0) return;
-    const allCode = files.map((f, i) => `=== File ${i + 1}: ${f.name} ===\n${f.content}\n\n`).join("\n");
-    const blob = new Blob([allCode], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "code_files.txt";
-    a.click();
-    URL.revokeObjectURL(url);
+  function extractDownloadUrl(content: string): string | null {
+    const match = content.match(/\/api\/downloads\/[a-zA-Z0-9_-]+\/[^.\s]+\.zip/);
+    return match ? match[0] : null;
   }
 
   // Load existing conversation from the /api/conversations endpoint
@@ -365,15 +351,22 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
               {msgs.map((m) => (
                 <div key={m.id}>
                   <Bubble role={m.role}>{m.content}</Bubble>
-                  {m.role === "assistant" && m.content.includes("```") && (
-                    <button
-                      onClick={() => generateZipFromCode(m.content)}
-                      className="mt-2 flex items-center gap-2 text-xs text-text-muted hover:text-foreground"
-                    >
-                      <Download className="h-3 w-3" />
-                      Download all code
-                    </button>
-                  )}
+                  {m.role === "assistant" && (() => {
+                    const downloadUrl = extractDownloadUrl(m.content);
+                    if (downloadUrl) {
+                      return (
+                        <a
+                          href={downloadUrl}
+                          download
+                          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
+                        >
+                          <Download className="h-3 w-3" />
+                          Download file
+                        </a>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               ))}
               {streaming && (

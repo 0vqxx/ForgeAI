@@ -60,6 +60,37 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/downloads/list")
+async def list_downloads(request: Request):
+    """List downloadable files for the authenticated user."""
+    from clerk_middleware import get_user_id
+    user_id = get_user_id(request)
+    
+    if ROOT_DIR.name == "backend":
+        downloads_path = ROOT_DIR.parent / "public/downloads"
+    else:
+        downloads_path = ROOT_DIR / "public/downloads"
+    
+    user_downloads_dir = downloads_path / user_id
+    
+    if not user_downloads_dir.exists():
+        return {"files": []}
+    
+    files = []
+    for file_path in user_downloads_dir.iterdir():
+        if file_path.is_file() and file_path.name.endswith(".zip"):
+            files.append({
+                "name": file_path.name,
+                "url": f"/api/downloads/{user_id}/{file_path.name}",
+                "size": file_path.stat().st_size,
+                "created": file_path.stat().st_ctime
+            })
+    
+    # Sort by creation time, newest first
+    files.sort(key=lambda x: x["created"], reverse=True)
+    return {"files": files}
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
