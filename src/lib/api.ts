@@ -18,10 +18,10 @@ export function useConversationsApi() {
       return res.json();
     },
 
-    create: async (title?: string, model?: string): Promise<ConversationRow> => {
+    create: async (title?: string, model?: string, id?: string): Promise<ConversationRow> => {
       const res = await fetch("/api/conversations", {
         method: "POST",
-        body: JSON.stringify({ title, model }),
+        body: JSON.stringify({ title, model, id }),
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();

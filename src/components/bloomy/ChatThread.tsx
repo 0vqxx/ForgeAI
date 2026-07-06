@@ -203,7 +203,7 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
     }
 
     try {
-      const created = await conversations.create(titleForNew, model);
+      const created = await conversations.create(titleForNew, model, convoId.current);
       if (!created?.id) {
         toast.error("Failed to create conversation. Please try again.");
         return null;
@@ -241,15 +241,8 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
       ? (text.length > 30 ? text.slice(0, 27) + "..." : text)
       : titleRef.current;
 
-    const wasNew = isNew.current;
     const apiId = await getOrCreateConvoId(t);
     if (!apiId) return;
-
-    if (wasNew) {
-      // Force the URL to update so refreshes will load this chat, 
-      // but without a full reload or remount that interrupts streaming.
-      window.history.replaceState(null, "", `/chat/${apiId}`);
-    }
 
     // Update title if needed
     if (t !== titleRef.current) {

@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 import { Route as AuthSsoCallbackRouteImport } from './routes/auth.sso-callback'
+import { Route as ApiTestDbRouteImport } from './routes/api/test-db'
 import { Route as ApiStatsRouteImport } from './routes/api/stats'
 import { Route as ApiProjectsRouteImport } from './routes/api/projects'
 import { Route as ApiProfileRouteImport } from './routes/api/profile'
@@ -71,6 +72,11 @@ const AuthSsoCallbackRoute = AuthSsoCallbackRouteImport.update({
   id: '/sso-callback',
   path: '/sso-callback',
   getParentRoute: () => AuthRoute,
+} as any)
+const ApiTestDbRoute = ApiTestDbRouteImport.update({
+  id: '/api/test-db',
+  path: '/api/test-db',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStatsRoute = ApiStatsRouteImport.update({
   id: '/api/stats',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/api/profile': typeof ApiProfileRoute
   '/api/projects': typeof ApiProjectsRoute
   '/api/stats': typeof ApiStatsRoute
+  '/api/test-db': typeof ApiTestDbRoute
   '/auth/sso-callback': typeof AuthSsoCallbackRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/api/profile': typeof ApiProfileRoute
   '/api/projects': typeof ApiProjectsRoute
   '/api/stats': typeof ApiStatsRoute
+  '/api/test-db': typeof ApiTestDbRoute
   '/auth/sso-callback': typeof AuthSsoCallbackRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/api/profile': typeof ApiProfileRoute
   '/api/projects': typeof ApiProjectsRoute
   '/api/stats': typeof ApiStatsRoute
+  '/api/test-db': typeof ApiTestDbRoute
   '/auth/sso-callback': typeof AuthSsoCallbackRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
     | '/api/profile'
     | '/api/projects'
     | '/api/stats'
+    | '/api/test-db'
     | '/auth/sso-callback'
     | '/sign-in/$'
     | '/sign-up/$'
@@ -264,6 +274,7 @@ export interface FileRouteTypes {
     | '/api/profile'
     | '/api/projects'
     | '/api/stats'
+    | '/api/test-db'
     | '/auth/sso-callback'
     | '/sign-in/$'
     | '/sign-up/$'
@@ -289,6 +300,7 @@ export interface FileRouteTypes {
     | '/api/profile'
     | '/api/projects'
     | '/api/stats'
+    | '/api/test-db'
     | '/auth/sso-callback'
     | '/sign-in/$'
     | '/sign-up/$'
@@ -310,6 +322,7 @@ export interface RootRouteChildren {
   ApiProfileRoute: typeof ApiProfileRoute
   ApiProjectsRoute: typeof ApiProjectsRoute
   ApiStatsRoute: typeof ApiStatsRoute
+  ApiTestDbRoute: typeof ApiTestDbRoute
   SignInSplatRoute: typeof SignInSplatRoute
   ApiAdminUsersRoute: typeof ApiAdminUsersRoute
   ApiWebhooksClerkRoute: typeof ApiWebhooksClerkRoute
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/sso-callback'
       preLoaderRoute: typeof AuthSsoCallbackRouteImport
       parentRoute: typeof AuthRoute
+    }
+    '/api/test-db': {
+      id: '/api/test-db'
+      path: '/api/test-db'
+      fullPath: '/api/test-db'
+      preLoaderRoute: typeof ApiTestDbRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/stats': {
       id: '/api/stats'
@@ -565,6 +585,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfileRoute: ApiProfileRoute,
   ApiProjectsRoute: ApiProjectsRoute,
   ApiStatsRoute: ApiStatsRoute,
+  ApiTestDbRoute: ApiTestDbRoute,
   SignInSplatRoute: SignInSplatRoute,
   ApiAdminUsersRoute: ApiAdminUsersRoute,
   ApiWebhooksClerkRoute: ApiWebhooksClerkRoute,
@@ -572,3 +593,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

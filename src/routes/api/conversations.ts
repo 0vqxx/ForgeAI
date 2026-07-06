@@ -23,13 +23,19 @@ export const Route = createFileRoute("/api/conversations")({
         if (!auth.ok) return auth.response;
 
         const body = await request.json().catch(() => ({}));
-        const { title, model } = body as { title?: string; model?: string };
+        const { title, model, id } = body as { title?: string; model?: string; id?: string };
 
-        const rows = await sql`
-          INSERT INTO conversations (user_id, title, model)
-          VALUES (${auth.userId}, ${title || "New chat"}, ${model || "claude-sonnet-4-6"})
-          RETURNING id, user_id, title, project_id, agent_id, model, created_at, updated_at
-        `;
+        const rows = id
+          ? await sql`
+              INSERT INTO conversations (id, user_id, title, model)
+              VALUES (${id}, ${auth.userId}, ${title || "New chat"}, ${model || "claude-sonnet-4-6"})
+              RETURNING id, user_id, title, project_id, agent_id, model, created_at, updated_at
+            `
+          : await sql`
+              INSERT INTO conversations (user_id, title, model)
+              VALUES (${auth.userId}, ${title || "New chat"}, ${model || "claude-sonnet-4-6"})
+              RETURNING id, user_id, title, project_id, agent_id, model, created_at, updated_at
+            `;
         return Response.json(rows[0], { status: 201 });
       },
     },
