@@ -50,6 +50,7 @@ export function ModelSelector({
               {group.models.map((key) => {
                 const info = NVIDIA_MODELS[key];
                 const isGlm52 = key === "z-ai/glm-5.2";
+                const isGemini = key === "google/gemma-4-31b-it";
                 return (
                   <button
                     key={key}
@@ -59,14 +60,19 @@ export function ModelSelector({
                     }}
                     className={`w-full px-3 py-2 text-left text-[13px] flex items-center gap-2 transition-colors hover:bg-muted/50 ${
                       model === key ? "bg-muted/80 font-medium text-foreground" : "text-foreground/80"
-                    } ${isGlm52 ? "relative font-semibold text-amber-500 hover:text-amber-400" : ""}`}
-                    style={isGlm52 ? { textShadow: "0 0 8px rgba(245, 158, 11, 0.4)" } : undefined}
+                    } ${isGlm52 ? "relative font-semibold text-amber-500 hover:text-amber-400" : ""} ${isGemini ? "relative font-semibold text-blue-500 hover:text-blue-400" : ""}`}
+                    style={isGlm52 ? { textShadow: "0 0 8px rgba(245, 158, 11, 0.4)" } : isGemini ? { textShadow: "0 0 8px rgba(59, 130, 246, 0.4)" } : undefined}
                   >
                     <ProviderIcon provider={info.provider} model={key} size={14} />
                     {info.label}
                     {isGlm52 && (
                       <span className="ml-auto text-[8px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 animate-pulse font-bold tracking-wider uppercase">
                         Strong
+                      </span>
+                    )}
+                    {isGemini && (
+                      <span className="ml-auto text-[8px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-500 border border-blue-500/30 font-bold tracking-wider uppercase">
+                        Fast
                       </span>
                     )}
                   </button>
