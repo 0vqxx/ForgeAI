@@ -71,9 +71,9 @@ export function parseTools(raw: string) {
 
 export function ToolBlock({ call, status }: { call: string, status: "running" | "completed" }) {
   return (
-    <div className="my-2 flex items-center gap-2 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-xs font-mono text-text-muted">
-      <Wrench className={`h-3.5 w-3.5 ${status === "running" ? "animate-pulse text-blue-400" : "text-text-muted opacity-50"}`} />
-      <span className={status === "completed" ? "opacity-60" : "text-blue-400"}>{call}</span>
+    <div className="my-2 flex items-center gap-2 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-xs font-mono">
+      <Wrench className={`h-3.5 w-3.5 ${status === "running" ? "animate-pulse text-blue-400" : "text-foreground/50"}`} />
+      <span className={status === "completed" ? "text-foreground/90" : "text-blue-400"}>{call}</span>
       {status === "running" && (
         <span className="ml-auto flex items-center gap-1 text-blue-400">
            <span className="inline-block h-1 w-1 animate-bounce rounded-full bg-blue-400 [animation-delay:0ms]" />
