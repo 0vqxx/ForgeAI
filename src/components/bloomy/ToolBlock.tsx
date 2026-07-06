@@ -92,7 +92,7 @@ export function ContentWithTools({ content }: { content: string }) {
   const segments = parseTools(content);
 
   const extractDownloadUrl = (text: string): string | null => {
-    const match = text.match(/\/api\/downloads\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.zip/);
+    const match = text.match(/\/api\/downloads\/[^/\s]+\/[^/\s]+\.zip/);
     return match ? match[0] : null;
   };
 
