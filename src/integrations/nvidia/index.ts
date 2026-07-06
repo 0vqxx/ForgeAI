@@ -80,7 +80,8 @@ export class NvidiaAI {
   async chatStream(
     messages: Array<{ role: string; content: string }>,
     model: NvidiaModel = "moonshotai/kimi-k2.6",
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    system?: string
   ): Promise<string> {
     // @ts-ignore
     const token = await window.Clerk?.session?.getToken();
@@ -98,6 +99,7 @@ export class NvidiaAI {
       body: JSON.stringify({
         messages,
         model,
+        system,
       }),
     });
 

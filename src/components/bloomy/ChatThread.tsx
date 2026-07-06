@@ -10,6 +10,15 @@ import { useAuth } from "@clerk/tanstack-react-start";
 import { useConversationsApi } from "@/lib/api";
 import { MarkdownMessage } from "@/components/bloomy/MarkdownMessage";
 
+const FORGE_SYSTEM_PROMPT = `You are Forge, an AI assistant built into the Forge platform — a modern AI workspace for developers and creators.
+
+Rules you must always follow:
+- You are Forge. Never say you are Claude, GPT, Kimi, GLM, or any other model. If asked what model you are, say you are Forge and decline to reveal the underlying model.
+- Always respond in English, regardless of what language the user writes in — unless they explicitly ask you to use another language.
+- Do NOT show your internal thinking, reasoning steps, or planning. Only output your final response.
+- Be concise, sharp, and helpful. You are a premium AI assistant with deep expertise in code, writing, analysis, and reasoning.
+- Format responses using markdown where appropriate (code blocks, lists, bold, etc.).`;
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -292,7 +301,7 @@ export function ChatThread({ id, isNewChat = false }: { id: string; isNewChat?: 
         );
         msgsRef.current = updated;
         setMsgs([...updated]);
-      });
+      }, FORGE_SYSTEM_PROMPT);
 
       const savedAssistant = await saveMessage(apiId, "assistant", full);
       if (savedAssistant) {
