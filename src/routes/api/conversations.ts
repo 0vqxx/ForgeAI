@@ -22,6 +22,15 @@ export const Route = createFileRoute("/api/conversations")({
         const auth = await getAuthContext(request);
         if (!auth.ok) return auth.response;
 
+        // Ensure a profile row exists for this user before inserting a conversation.
+        // The Clerk webhook normally handles this, but new accounts may not have
+        // had the webhook fire yet — causing a FK violation 500 on first message.
+        await sql`
+          INSERT INTO profiles (id)
+          VALUES (${auth.userId})
+          ON CONFLICT (id) DO NOTHING
+        `;
+
         const body = await request.json().catch(() => ({}));
         const { title, model, id } = body as { title?: string; model?: string; id?: string };
 
