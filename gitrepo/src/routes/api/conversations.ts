@@ -1,0 +1,53 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { createSupabaseContext } from "@supabase/server";
+import type { Database } from "@/integrations/supabase/types";
+
+export const Route = createFileRoute("/api/conversations")({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
+        if (error) {
+          return Response.json({ message: error.message }, { status: error.status });
+        }
+
+        const { data, error: dbError } = await ctx.supabase
+          .from("conversations")
+          .select("id, title, created_at, updated_at, model")
+          .order("updated_at", { ascending: false });
+
+        if (dbError) {
+          return Response.json({ message: dbError.message }, { status: 500 });
+        }
+
+        return Response.json(data ?? []);
+      },
+
+      POST: async ({ request }) => {
+        const { data: ctx, error } = await createSupabaseContext<Database>(request, { auth: "user" });
+        if (error) {
+          return Response.json({ message: error.message }, { status: error.status });
+        }
+
+        const body = await request.json().catch(() => ({}));
+        const { title, model } = body as { title?: string; model?: string };
+
+        const { data, error: dbError } = await ctx.supabase
+          .from("conversations")
+          .insert({
+            user_id: ctx.userClaims!.id,
+            title: title || "New chat",
+            model: model || "claude-sonnet-4-6",
+          })
+          .select("id, title, created_at, updated_at, model")
+          .single();
+
+        if (dbError) {
+          return Response.json({ message: dbError.message }, { status: 500 });
+        }
+
+        return Response.json(data, { status: 201 });
+      },
+    },
+  },
+});

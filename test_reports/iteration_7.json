@@ -1,0 +1,19 @@
+{
+  "summary": "Forge IDE final retest PASSED. Hard-reloaded with cache-buster, localStorage cleared, model defaulted to GLM 5.1 (z-ai/glm-5.1), agent mode was already ON by default (button text 'Agent'). Sent 'Create a file named hello.txt with the text Hi there' via chat. Outbound POST /api/ai/chat/stream contained messages array of length 1 with last user content starting with '[AGENT TASK — respond ONLY with <forge-file...' — confirming ChatPanel.jsx line 139 fix (useChatHistory.getState()) is now active in the bundle and the AGENT TASK prefix is properly applied. Within ~12s, GET /api/fs/read?path=hello.txt returned 200 with body {\"path\":\"hello.txt\",\"content\":\"Hi there\\n\"}. UI also showed 'Created hello.txt' toast.",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "Hard reload bypassed cached bundle (cache-buster query + localStorage clear)",
+    "Model selector shows 'GLM 5.1' (value=z-ai/glm-5.1) by default",
+    "Agent mode default state ON (Agent button shows 'Agent' label)",
+    "POST /api/ai/chat/stream messages array is non-empty (count=1) — prior empty-array bug fixed",
+    "Last user message content contains '[AGENT TASK' prefix",
+    "hello.txt created within 60s with content 'Hi there'",
+    "UI displays 'Created hello.txt' confirmation toast and agent file action card"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Iteration 6 stale-bundle issue is resolved. End-to-end agent flow (chat -> stream -> forge-file action -> fs write) verified. Build is ready for user delivery."
+}

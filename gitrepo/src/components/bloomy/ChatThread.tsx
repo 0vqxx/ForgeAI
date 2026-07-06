@@ -1,0 +1,502 @@
+import { useEffect, useRef, useState } from "react";
+import { AppShell } from "@/components/bloomy/AppShell";
+import { ForgeMark } from "@/components/bloomy/Logo";
+import { ModelSelector } from "@/components/bloomy/ModelSelector";
+import { nvidiaAI, type NvidiaModel } from "@/integrations/nvidia";
+import { ArrowUp, Loader2, Paperclip, X, Download } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: string;
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  const morning = [
+    { prefix: "What are we creating ", highlight: "this morning", suffix: "?" },
+    { prefix: "Ready to face ", highlight: "the day", suffix: "?" },
+    { prefix: "Need coffee, or will my ", highlight: "replies", suffix: " suffice?" },
+    { prefix: "Rise and shine. Or just stay in ", highlight: "dark mode", suffix: "." },
+    { prefix: "Did you dream of me, or was it just another ", highlight: "server restart", suffix: "?" },
+    { prefix: "Let's build something before the ", highlight: "meetings", suffix: " start." }
+  ];
+
+  const afternoon = [
+    { prefix: "How is your ", highlight: "afternoon", suffix: " going?" },
+    { prefix: "What should we focus on ", highlight: "this afternoon", suffix: "?" },
+    { prefix: "Ah, the afternoon slump. Let's do something ", highlight: "interesting", suffix: "." },
+    { prefix: "Are we building something cool, or just avoiding ", highlight: "chores", suffix: "?" },
+    { prefix: "Need a distraction from whatever you're ", highlight: "supposed to be doing", suffix: "?" },
+    { prefix: "What's the plan for ", highlight: "escaping reality", suffix: " today?" }
+  ];
+
+  const evening = [
+    { prefix: "Winding down, or winding up for a ", highlight: "side project", suffix: "?" },
+    { prefix: "What's on your mind ", highlight: "this evening", suffix: "?" },
+    { prefix: "Are we doing some serious work, or just ", highlight: "playing around", suffix: "?" },
+    { prefix: "Let's design something crazy. What could ", highlight: "go wrong", suffix: "?" },
+    { prefix: "What is the story we are writing ", highlight: "tonight", suffix: "?" }
+  ];
+
+  const night = [
+    { prefix: "Burning the ", highlight: "midnight oil", suffix: "?" },
+    { prefix: "Late night thoughts. What is keeping you ", highlight: "awake", suffix: "?" },
+    { prefix: "Go to sleep. Or let's keep talking, I don't ", highlight: "sleep", suffix: " anyway." },
+    { prefix: "It's late. Perfect time for some questionable ", highlight: "life decisions", suffix: "." },
+    { prefix: "Midnight ideas hit different. What are we ", highlight: "exploring", suffix: "?" }
+  ];
+
+  let list = morning;
+  if (hour >= 5 && hour < 12) {
+    list = morning;
+  } else if (hour >= 12 && hour < 17) {
+    list = afternoon;
+  } else if (hour >= 17 && hour < 22) {
+    list = evening;
+  } else {
+    list = night;
+  }
+
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+export function ChatThread({ id }: { id: string }) {
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [greeting] = useState(() => getGreeting());
+  const [title, setTitle] = useState("New chat");
+  const [model, setModel] = useState<NvidiaModel>("moonshotai/kimi-k2.6");
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const titleRef = useRef("New chat");
+  const msgsRef = useRef<ChatMessage[]>([]);
+  const convoId = useRef(id);
+  const isNew = useRef(true);
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    setAttachedFiles((prev) => [...prev, ...files]);
+  }
+
+  function removeFile(index: number) {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function generateZipFromCode(content: string) {
+    const codeRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const files: { name: string; content: string }[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = codeRegex.exec(content)) !== null) {
+      const lang = match[1] || "txt";
+      files.push({ name: `code_${files.length + 1}.${lang}`, content: match[2] });
+    }
+    if (files.length === 0) return;
+    const allCode = files.map((f, i) => `=== File ${i + 1}: ${f.name} ===\n${f.content}\n\n`).join("\n");
+    const blob = new Blob([allCode], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "code_files.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Load existing conversation directly from Supabase
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      // Wait for auth session to be restored from storage before querying
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      const { data: convo, error: convoErr } = await supabase
+        .from("conversations")
+        .select("id, title, model")
+        .eq("id", id)
+        .single();
+
+      if (cancelled) return;
+
+      if (convoErr || !convo) {
+        // Conversation not found or access denied — treat as new
+        isNew.current = true;
+        convoId.current = id;
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      isNew.current = false;
+      convoId.current = convo.id;
+      titleRef.current = convo.title ?? "New chat";
+      setTitle(convo.title ?? "New chat");
+      if (convo.model) setModel(convo.model as NvidiaModel);
+
+      const { data: messages } = await supabase
+        .from("messages")
+        .select("id, role, content, created_at")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true });
+
+      if (!cancelled) {
+        if (messages && messages.length > 0) {
+          const loaded: ChatMessage[] = messages.map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant" | "system",
+            content: m.content,
+            timestamp: m.created_at,
+          }));
+          msgsRef.current = loaded;
+          setMsgs(loaded);
+        }
+        setLoading(false);
+      }
+    }
+
+    load().catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [id]);
+
+  useEffect(() => {
+    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
+  }, [msgs, streaming]);
+
+  function refreshSidebar() {
+    window.dispatchEvent(new Event("forge:refresh-chats"));
+  }
+
+  async function getOrCreateConvoId(titleForNew: string): Promise<string | null> {
+    if (!isNew.current) return convoId.current;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("You're not signed in.");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("conversations")
+      .insert({
+        id: convoId.current,
+        user_id: user.id,
+        title: titleForNew,
+        model,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      console.error("[ChatThread] Failed to create conversation:", error);
+      toast.error("Failed to create conversation. Please try again.");
+      return null;
+    }
+
+    convoId.current = data.id;
+    isNew.current = false;
+    return data.id;
+  }
+
+  async function saveMessage(conversationId: string, role: "user" | "assistant", content: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({ conversation_id: conversationId, user_id: user.id, role, content })
+      .select("id, role, content, created_at")
+      .single();
+
+    if (error) {
+      console.error("[ChatThread] Failed to save message:", error);
+      return null;
+    }
+    return data;
+  }
+
+  async function send(e: React.FormEvent, promptText?: string) {
+    e.preventDefault();
+    const text = (promptText ?? input).trim();
+    if (!text || streaming) return;
+    setInput("");
+
+    const t = titleRef.current === "New chat" && msgsRef.current.length === 0
+      ? (text.length > 30 ? text.slice(0, 27) + "..." : text)
+      : titleRef.current;
+
+    const apiId = await getOrCreateConvoId(t);
+    if (!apiId) return;
+
+    // Update title if needed
+    if (t !== titleRef.current) {
+      titleRef.current = t;
+      setTitle(t);
+      await supabase.from("conversations").update({ title: t }).eq("id", apiId);
+    }
+
+    // Save user message
+    const savedUser = await saveMessage(apiId, "user", text);
+    const userMsg: ChatMessage = savedUser
+      ? { id: savedUser.id, role: "user", content: savedUser.content, timestamp: savedUser.created_at }
+      : { id: Date.now().toString(), role: "user", content: text, timestamp: new Date().toISOString() };
+
+    const withUser = [...msgsRef.current, userMsg];
+    msgsRef.current = withUser;
+    setMsgs(withUser);
+
+    setStreaming(true);
+
+    try {
+      const history = withUser
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      let full = "";
+      const assistantId = (Date.now() + 1).toString();
+      const placeholder: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+      };
+      const withPlaceholder = [...withUser, placeholder];
+      msgsRef.current = withPlaceholder;
+      setMsgs(withPlaceholder);
+
+      await nvidiaAI.chatStream(history, model, (chunk) => {
+        full += chunk;
+        const updated = withPlaceholder.map((m) =>
+          m.id === assistantId ? { ...m, content: full } : m
+        );
+        msgsRef.current = updated;
+        setMsgs([...updated]);
+      });
+
+      const savedAssistant = await saveMessage(apiId, "assistant", full);
+      if (savedAssistant) {
+        const final = withPlaceholder.map((m) =>
+          m.id === assistantId
+            ? { id: savedAssistant.id, role: "assistant" as const, content: full, timestamp: savedAssistant.created_at }
+            : m
+        );
+        msgsRef.current = final;
+        setMsgs(final);
+      }
+
+      refreshSidebar();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to get response");
+      msgsRef.current = withUser;
+      setMsgs(withUser);
+    } finally {
+      setStreaming(false);
+      setSigningIn(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="flex h-[calc(100dvh-3.5rem)] items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell
+      topRight={
+        <div className="flex items-center gap-2 text-[12px] text-text-muted">
+          <ModelSelector model={model} onSelect={setModel} />
+        </div>
+      }
+    >
+      <div className="flex h-[calc(100dvh-3.5rem)] flex-col">
+        <div ref={scrollerRef} className="flex-1 overflow-y-auto px-6 py-8 md:px-10">
+          {msgs.length === 0 ? (
+            <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center">
+              <div className="text-center">
+                <h1 className="font-display text-[44px] leading-[1.05] tracking-tight md:text-[56px]">
+                  {greeting.prefix}
+                  <span className="forge-gradient-text">{greeting.highlight}</span>
+                  {greeting.suffix}
+                </h1>
+                <p className="mt-3 text-base text-text-muted">
+                  Ask me anything — I'm here to help you think, build, and ship.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-3xl space-y-6">
+              {msgs.map((m) => (
+                <div key={m.id}>
+                  <Bubble role={m.role}>{m.content}</Bubble>
+                  {m.role === "assistant" && m.content.includes("```") && (
+                    <button
+                      onClick={() => generateZipFromCode(m.content)}
+                      className="mt-2 flex items-center gap-2 text-xs text-text-muted hover:text-foreground"
+                    >
+                      <Download className="h-3 w-3" />
+                      Download all code
+                    </button>
+                  )}
+                </div>
+              ))}
+              {streaming && (
+                <div className="flex items-center gap-2 text-sm text-text-muted">
+                  <span className="h-1.5 w-1.5 animate-forge-pulse rounded-full bg-forge-orange" />
+                  {signingIn ? "Signing in to Puter..." : "Forge is thinking..."}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <form
+          onSubmit={(e) => void send(e)}
+          className="border-t border-divider bg-background/60 px-6 py-4 backdrop-blur-xl md:px-10"
+        >
+          <div className="mx-auto flex max-w-3xl flex-col gap-2">
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center gap-2 rounded-lg bg-elevated px-3 py-1.5 text-sm">
+                    <Paperclip className="h-3 w-3 text-text-muted" />
+                    <span className="max-w-[150px] truncate">{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="rounded-full p-0.5 hover:bg-muted"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="elev-1 grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-border bg-elevated text-text-muted transition-all hover:bg-muted"
+                title="Attach files"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send(e);
+                  }
+                }}
+                rows={1}
+                placeholder="Ask Forge anything..."
+                className="forge-input elev-1 max-h-40 min-h-[44px] flex-1 resize-none rounded-2xl border border-border bg-elevated px-4 py-3 text-sm outline-none transition-all focus:border-foreground/40 focus:ring-2 focus:ring-forge-orange/30"
+              />
+              <button
+                type="submit"
+                disabled={streaming || !input.trim()}
+                className="forge-send-btn elev-1 grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-all hover:opacity-95 disabled:opacity-50"
+              >
+                {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </AppShell>
+  );
+}
+
+/** Render markdown-like content with code blocks */
+function renderMessage(content: string) {
+  const elements: JSX.Element[] = [];
+  const codeRegex = /```([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = codeRegex.exec(content)) !== null) {
+    const before = content.slice(lastIndex, match.index);
+    if (before) elements.push(...renderTextBlock(before, elements.length));
+    const code = match[1];
+    const key = `code-${elements.length}`;
+    elements.push(
+      <pre key={key} className="relative rounded bg-gray-800 p-4 text-sm text-white overflow-x-auto">
+        <code className="block whitespace-pre">{code}</code>
+        <button
+          className="absolute top-2 right-2 rounded bg-gray-700 px-2 py-1 text-xs hover:bg-gray-600"
+          onClick={() => navigator.clipboard.writeText(code)}
+        >Copy</button>
+        <a
+          className="absolute top-2 right-24 rounded bg-gray-700 px-2 py-1 text-xs hover:bg-gray-600"
+          href={URL.createObjectURL(new Blob([code], { type: "text/plain" }))}
+          download="snippet.txt"
+        >Download</a>
+      </pre>
+    );
+    lastIndex = codeRegex.lastIndex;
+  }
+  const tail = content.slice(lastIndex);
+  if (tail) elements.push(...renderTextBlock(tail, elements.length));
+  return elements;
+}
+
+function renderTextBlock(txt: string, startIdx: number): JSX.Element[] {
+  return txt.split("\n").map((line, i) => {
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      const level = heading[1].length as 1 | 2 | 3 | 4 | 5 | 6;
+      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+      return <Tag key={`${startIdx}-${i}`} className="mt-2 mb-1 font-bold">{heading[2]}</Tag>;
+    }
+    return <p key={`${startIdx}-${i}`} className="whitespace-pre-wrap">{line}</p>;
+  });
+}
+
+function Bubble({ role, children }: { role: "user" | "assistant" | "system"; children: React.ReactNode }) {
+  if (role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="elev-1 max-w-xl whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+          {children}
+        </div>
+      </div>
+    );
+  }
+  const content = typeof children === "string" ? children : String(children);
+  return (
+    <div className="flex items-start gap-3">
+      <div className="elev-1 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-elevated">
+        <ForgeMark size={20} />
+      </div>
+      <div className="max-w-2xl pt-1 text-sm leading-relaxed text-foreground">{renderMessage(content)}</div>
+    </div>
+  );
+}

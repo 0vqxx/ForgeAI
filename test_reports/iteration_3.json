@@ -1,0 +1,25 @@
+{
+  "summary": "Final retest of Forge IDE agent-mode write flow after system-prompt strengthening (few-shot + 'never ask for confirmation' rule) in ChatPanel.jsx. Explorer and terminal re-confirmed working. Agent-mode toggle is correctly in active orange 'Agent' state by default with model 'Llama 3.3 70B'. However, the agent STILL does not emit <forge-file> blocks for the exact prompt from the few-shot example.",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "App loads at REACT_APP_BACKEND_URL",
+    "Explorer renders tree-example.py (data-testid='tree-example.py' visible)",
+    "Terminal shows 'forge workspace $' prompt",
+    "data-testid='agent-toggle' present and in active orange 'Agent' state by default; selected model is 'Llama 3.3 70B'",
+    "Chat input accepts text and chat-send-btn sends the message; streaming reply completes"
+  ],
+  "failed": [
+    {
+      "area": "Agent-mode write flow (NVIDIA Llama 3.3 70B)",
+      "issue": "Agent did NOT emit any <forge-file> block. For the exact few-shot prompt 'Create a file named hello.txt with the text Hi there', the model replied conversationally: \"I'm ready to create and update files according to your instructions. What would you like me to do?\" — i.e. it is STILL asking for confirmation/clarification despite the new 'never ask for confirmation' rule and the explicit hello.txt few-shot example in AGENT_SYSTEM.",
+      "evidence": "GET /api/fs/read?path=hello.txt returned HTTP 404 after the full 60s streaming wait. Chat panel header shows orange 'Agent' badge confirming agent mode was active. Screenshot saved at .screenshots/agent_reply.png.",
+      "priority": "HIGH"
+    }
+  ],
+  "action_items": [
+    "The strengthened system prompt (few-shot + 'never ask for confirmation') in /app/frontend/src/ide/components/ChatPanel.jsx is NOT having the intended effect on meta/llama-3.3-70b-instruct via the NVIDIA endpoint. Verify in browser DevTools / backend logs that (a) the new AGENT_SYSTEM string is actually being sent on the request, and (b) it is being placed in the 'system' role (not appended to user message). If both are correct, consider: lowering temperature, switching default to a stronger instruction-following model, or moving the 'You must emit <forge-file> immediately, never ask for confirmation' rule to the very end of the system prompt and/or prepending it to the user turn."
+  ],
+  "success_rate": {"backend": "n/a (frontend-only test, /api/fs/read verified working)", "frontend": "75% (3 of 4 checks passed; agent write flow still broken)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}

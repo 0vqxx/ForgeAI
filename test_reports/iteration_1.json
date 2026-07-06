@@ -1,0 +1,55 @@
+{
+  "summary": "Backend endpoints largely functional when responsive: fs/tree, ai/models (5 models, has_key:true), ai/chat/stream (SSE deltas), ai/complete, ai/edit, fs/write+read, fs/upload, fs/create, fs/rename, terminal WebSocket echo, git/status all returned expected payloads. Frontend shell loads (title 'Forge — AI Code Editor'), menu bar (File/Edit/Selection/View/Go/Run/AI/Help) works (File dropdown opens), terminal panel visible by default, Agent pill and F logo present in chat header. CRITICAL ISSUE: file explorer renders 'Empty workspace — create a file to begin.' even though GET /api/fs/tree?path= correctly returns example.py + welcome.md; no [data-testid=tree-example.py] nor [data-testid=tree-welcome.md] elements found in DOM — explorer integration is broken. SECONDARY: backend (single uvicorn worker) became unresponsive on plain HTTP after the terminal WebSocket interactions during testing (localhost:8001 hangs, public URL returns 502 from Cloudflare); reader_task in routes/terminal.py runs a polling executor loop which may be starving the event loop. The agent-mode write flow (POST chat with prompt 'Create file hello.txt') could not be exercised because backend became unresponsive and Explorer was already broken.",
+  "tested_scope": ["frontend", "backend", "integration"],
+  "passed": [
+    "GET /api/fs/tree returns example.py + welcome.md",
+    "GET /api/ai/models returns 5 models (GLM, Kimi, Jamba, Mistral, Llama) with has_key:true",
+    "POST /api/ai/chat/stream emits SSE 'data: {\"delta\":...}' chunks and [DONE]",
+    "POST /api/ai/complete with model=meta/llama-3.3-70b-instruct returns non-empty completion for def fib(n)",
+    "POST /api/ai/edit returns corrected code (a+b instead of a-b)",
+    "POST /api/fs/write + GET /api/fs/read round-trip works",
+    "POST /api/fs/upload multipart import works (returns ok+path+size)",
+    "POST /api/fs/create (is_dir:true) + POST /api/fs/rename works (rename uses 'path'/'new_path' fields)",
+    "WebSocket /api/terminal/ws accepts connection and echoes shell output containing 'hi'",
+    "GET /api/git/status returns {repo:false,files:[],branch:null}",
+    "Frontend title is 'Forge — AI Code Editor'",
+    "MenuBar visible with File/Edit/Selection/View/Go/Run/AI/Help; File dropdown opens (New File, New Folder, Save, Auto Save, Settings)",
+    "Terminal panel visible by default with xterm rendered; status bar Terminal button visible",
+    "Chat panel shows F logo and Agent toggle pill (orange)"
+  ],
+  "failed": [
+    {
+      "area": "frontend / explorer integration",
+      "issue": "FileExplorer displays 'Empty workspace — create a file to begin.' even though /api/fs/tree returns example.py and welcome.md. Expected data-testid='tree-example.py' is not present in the DOM. Clicking tree files therefore impossible and Monaco file-open flow cannot be exercised.",
+      "evidence": "Backend curl: {\"entries\":[{\"name\":\"example.py\",...},{\"name\":\"welcome.md\",...}]}. Browser screenshot of Explorer panel reads 'EXPLORER / Empty workspace — create a file to begin.' Locator [data-testid=\"tree-example.py\"] is_visible=False; [data-testid=\"tree-welcome.md\"] is_visible=False.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "backend stability",
+      "issue": "After running terminal WebSocket test and a few subsequent HTTP calls, backend became unresponsive on plain HTTP. localhost:8001 requests hang; public URL returns Cloudflare 502 'Bad gateway'. Uvicorn process still RUNNING with 1 worker; WebSocket connections remained 'open' in logs. The terminal reader_task polls select.select via run_in_executor every 50ms in a tight loop, which can starve other requests on a single-worker server.",
+      "evidence": "supervisorctl shows backend RUNNING pid 3014; curl --max-time 10 http://localhost:8001/api/fs/tree returns no body within 10s. Backend log ends with '... connection open' (no close). /app/backend/routes/terminal.py line 46-49 shows: while True: await loop.run_in_executor(None, lambda: select.select([fd],[],[],0.05))",
+      "priority": "HIGH"
+    },
+    {
+      "area": "agent-mode file write flow",
+      "issue": "Could not verify that asking the agent 'Create a file named hello.txt with the text Hi there' actually writes /app/workspace/hello.txt — Explorer was broken and backend became unresponsive before a full end-to-end chat could be issued from the UI. /app/workspace/hello.txt does NOT currently exist.",
+      "evidence": "ls -la /app/workspace shows: example.py, t1folder_renamed, test_t1.txt, upload_t1.txt, welcome.md — no hello.txt.",
+      "priority": "MEDIUM"
+    },
+    {
+      "area": "api contract (minor)",
+      "issue": "POST /api/ai/complete requires 'model' field (returns 422 if omitted). If the frontend ever calls it without a model, ghost-text will fail. Confirm EditorArea.jsx always sends a model.",
+      "evidence": "curl without model -> 422 missing 'model'. With model=meta/llama-3.3-70b-instruct -> 200 with completion.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Debug FileExplorer.jsx: verify the initial fetch to /api/fs/tree fires on mount, that REACT_APP_BACKEND_URL is read correctly in lib/api.js, and that the rendered tree maps entries to [data-testid=\"tree-<name>\"] nodes. Currently the Explorer falls through to the 'Empty workspace' empty-state.",
+    "Fix backend event-loop starvation in /app/backend/routes/terminal.py — replace the busy-poll (select.select with 50ms timeout inside run_in_executor in a while True) with loop.add_reader(fd, ...) or asyncio.get_event_loop().connect_read_pipe / a longer blocking executor read. Currently a single open terminal WebSocket can render all other HTTP endpoints unresponsive on the single-worker uvicorn.",
+    "Verify EditorArea.jsx sends the selected model with every /api/ai/complete call (required field).",
+    "After Explorer + backend stability fixes, re-test the agent-mode 'create hello.txt' flow end-to-end."
+  ],
+  "success_rate": {"backend": "100% on first-call functional checks, but availability degraded under concurrent WS load", "frontend": "~70% (shell/menu/terminal/chat header pass, file explorer and downstream file-open flow fail)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}

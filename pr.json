@@ -1,0 +1,6 @@
+{
+  "title": "feat: restore direct remote Supabase DB connectivity and remove GLM 5.1 model",
+  "head": "Repcoders:main",
+  "base": "main",
+  "body": "This Pull Request restores direct remote Supabase database connectivity by reverting the client-side local storage mocking, fixes route-guard authentication, implements brand logo contrast inversion for light themes, integrates dynamic clock-based greetings, and removes the GLM 5.1 model option."
+}

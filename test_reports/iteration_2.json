@@ -1,0 +1,29 @@
+{
+  "summary": "Retest of iteration_1 HIGH bugs. BOTH terminal/backend-starvation and explorer-empty bugs are FIXED. With a held-open WebSocket /api/terminal/ws (after sending 'echo hello\\r'), concurrent GET /api/fs/tree and GET /api/ai/models both returned 200 in ~140ms each (well under 3s). Terminal interactivity confirmed: sending 'ls\\r' over the WS produced output containing 'example.py' within 5s. Frontend Explorer now renders [data-testid=tree-example.py] and [data-testid=tree-welcome.md]; clicking tree-example.py opens Monaco showing the fibonacci source. Regression endpoints still pass (fs/tree, ai/models, ai/chat/stream SSE, fs/upload). Agent-mode end-to-end write FAILED: the chat reply for 'Create a file named hello.txt with the text Hi there' was conversational ('I'm ready to assist. What code changes would you like me to make in your workspace?') and contained no <forge-file path action> blocks, so applyAgentActions parsed nothing and /app/workspace/hello.txt was not created (GET /api/fs/read?path=hello.txt -> 404). Agent toggle is on (orange pill visible), but the system prompt is not eliciting action blocks on the first turn.",
+  "tested_scope": ["frontend", "backend", "integration"],
+  "passed": [
+    "Backend stays responsive with WS open: concurrent /api/fs/tree (200, 0.14s) and /api/ai/models (200, 0.14s) while WS terminal is open and echoing",
+    "WS terminal 'echo hello\\r' returns 'hello' in stream",
+    "WS terminal 'ls\\r' returns output containing 'example.py' within 5s",
+    "FileExplorer renders [data-testid=tree-example.py] and [data-testid=tree-welcome.md] on load",
+    "Clicking tree-example.py opens example.py in Monaco (fibonacci source visible, 13+ lines)",
+    "Agent toggle visible (data-testid=agent-toggle), chat-input + chat-send-btn work and dispatch a request",
+    "POST /api/ai/chat/stream returns SSE 'data: {\"delta\":...}' chunks",
+    "POST /api/fs/upload still returns {ok:true,path,size}"
+  ],
+  "failed": [
+    {
+      "area": "agent-mode file write flow",
+      "issue": "Asking the agent 'Create a file named hello.txt with the text Hi there' produces a conversational reply with no <forge-file path action=\"write\"> block, so ChatPanel.applyAgentActions writes nothing. /app/workspace/hello.txt is not created (GET /api/fs/read?path=hello.txt returns 404). The toolchain is wired, but the system prompt / model is not emitting the expected action-block format on the first user turn.",
+      "evidence": "Screenshot shows assistant reply: 'I'm ready to assist. What code changes would you like me to make in your workspace?'. Polled GET /api/fs/read?path=hello.txt for 60s -> all 404. ls /app/workspace shows no hello.txt.",
+      "priority": "HIGH"
+    }
+  ],
+  "action_items": [
+    "Strengthen the Agent-mode system prompt in ChatPanel.jsx (or backend chat route) so that requests to create/modify files emit <forge-file path=\"...\" action=\"write\">...</forge-file> blocks on the FIRST turn, not a clarification. Include a few-shot example in the system prompt and instruct the model to never ask for confirmation when the file name and content are already provided by the user.",
+    "Optional: surface a small UI hint when an Agent reply contains zero action blocks (so users know nothing was written)."
+  ],
+  "success_rate": {"backend": "100% (5/5 endpoints incl. WS+concurrent HTTP)", "frontend": "~85% (explorer+Monaco+chat UI all work; agent write step does not produce a file)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}
