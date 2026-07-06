@@ -37,8 +37,8 @@ async def chat(request: ChatRequest, http_request: Request):
     try:
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
-        from backend.ai_service import ai_service as _ai_svc
-        from backend.ai_sdk_adapter import AIProvider
+        from ai_service import ai_service as _ai_svc
+        from ai_sdk_adapter import AIProvider
         provider_client = _ai_svc.adapter.get_client(AIProvider(request.provider))
         supports_agent = (
             hasattr(provider_client, "client") and
@@ -65,7 +65,7 @@ async def chat(request: ChatRequest, http_request: Request):
 
             user_id = getattr(http_request.state, "user_id", "default")
 
-            from backend.agents.runner import run_agent_loop
+            from agents.runner import run_agent_loop
             if request.stream:
                 async def generate():
                     try:
@@ -152,7 +152,7 @@ class ConfirmRequest(BaseModel):
 
 @router.post("/confirm/{command_id}")
 async def confirm_command(command_id: str, request: ConfirmRequest):
-    from backend.agents.confirmations import confirmation_manager
+    from agents.confirmations import confirmation_manager
     if command_id not in confirmation_manager.pending:
         raise HTTPException(status_code=404, detail="Command confirmation request not found")
     confirmation_manager.resolve(command_id, request.approved)

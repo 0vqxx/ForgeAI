@@ -1,9 +1,9 @@
 import json
 import asyncio
 from typing import AsyncGenerator
-from backend.agents.tools import TOOL_MAP, user_id_var
-from backend.ai_sdk_adapter import AIProvider
-from backend.ai_service import ai_service
+from agents.tools import TOOL_MAP, user_id_var
+from ai_sdk_adapter import AIProvider
+from ai_service import ai_service
 
 async def run_agent_loop(messages: list, model: str, provider_str: str, user_id: str = "default") -> AsyncGenerator[str, None]:
     """Stateful agent loop that executes tools and yields text and indicator events to the stream."""
@@ -148,7 +148,7 @@ async def run_agent_loop(messages: list, model: str, provider_str: str, user_id:
                         err_str = str(e).lower()
                         is_context_limit = "context length" in err_str or "reduce the length" in err_str or "context_length_exceeded" in err_str or "maximum context length" in err_str
                         if is_context_limit:
-                            from backend.ai_sdk_adapter import prune_messages
+                            from ai_sdk_adapter import prune_messages
                             new_messages = prune_messages(current_messages)
                             if len(new_messages) < len(current_messages):
                                 current_messages = new_messages

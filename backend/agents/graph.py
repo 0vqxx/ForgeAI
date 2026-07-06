@@ -2,10 +2,10 @@ import json
 from typing import Dict, Any, List
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage
-from backend.agents.state import AgentState
-from backend.agents.tools import tools
-from backend.ai_service import ai_service
-from backend.ai_sdk_adapter import Message, AIProvider
+from agents.state import AgentState
+from agents.tools import tools
+from ai_service import ai_service
+from ai_sdk_adapter import Message, AIProvider
 
 # Map tool names to tool instances
 TOOL_MAP = {t.name: t for t in tools}
