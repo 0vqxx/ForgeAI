@@ -25,6 +25,12 @@ export const Route = createFileRoute("/api/conversations/$id")({
           ORDER BY created_at ASC
         `;
 
+        console.log(`[GET /api/conversations/${params.id}] Fetched convo:`, conv[0]);
+        console.log(`[GET /api/conversations/${params.id}] Fetched messages length:`, messages.length);
+        if (messages.length > 0) {
+          console.log(`[GET /api/conversations/${params.id}] First message sample:`, messages[0]);
+        }
+
         return Response.json({ ...conv[0], messages });
       },
 

@@ -136,19 +136,29 @@ export function ChatThread({ id }: { id: string }) {
         setTitle(convo.title ?? "New chat");
         if (convo.model) setModel(convo.model as NvidiaModel);
 
+        console.log("[ChatThread] load() - API returned convo:", convo);
         const messages = convo.messages ?? [];
+        console.log("[ChatThread] load() - extracted messages array:", messages, "Length:", messages.length);
+
         if (messages.length > 0) {
-          const loaded: ChatMessage[] = messages.map((m) => ({
-            id: m.id,
-            role: m.role as "user" | "assistant" | "system",
-            content: m.content,
-            timestamp: m.created_at,
-          }));
+          const loaded: ChatMessage[] = messages.map((m) => {
+            console.log("[ChatThread] Mapping message from DB:", m);
+            return {
+              id: m.id,
+              role: m.role as "user" | "assistant" | "system",
+              content: m.content,
+              timestamp: m.created_at,
+            };
+          });
+          console.log("[ChatThread] load() - mapped loaded messages:", loaded);
           msgsRef.current = loaded;
           setMsgs(loaded);
+        } else {
+          console.log("[ChatThread] load() - no messages found, skipping state update");
         }
         if (!cancelled) setLoading(false);
-      } catch {
+      } catch (err) {
+        console.error("[ChatThread] load() - FAILED to load conversation:", err);
         // 404 means not found / no access — treat as new
         isNew.current = true;
         convoId.current = id;
@@ -194,11 +204,14 @@ export function ChatThread({ id }: { id: string }) {
   }
 
   async function saveMessage(conversationId: string, role: "user" | "assistant", content: string) {
+    console.log(`[ChatThread] saveMessage() called - ID: ${conversationId}, Role: ${role}`);
     try {
       const created = await conversations.addMessage(conversationId, role, content);
+      console.log(`[ChatThread] saveMessage() - SUCCESS:`, created);
       return created;
     } catch (err) {
       console.error("[ChatThread] Failed to save message:", err);
+      toast.error(`Failed to save message: ${(err as Error).message}`);
       return null;
     }
   }
