@@ -1,4 +1,4 @@
-import { Wrench } from "lucide-react";
+import { Wrench, Download } from "lucide-react";
 import { MarkdownMessage } from "./MarkdownMessage";
 
 /**
@@ -91,11 +91,31 @@ export function ToolBlock({ call, status }: { call: string, status: "running" | 
 export function ContentWithTools({ content }: { content: string }) {
   const segments = parseTools(content);
 
+  const extractDownloadUrl = (text: string): string | null => {
+    const match = text.match(/\/api\/downloads\/[a-zA-Z0-9_-]+\/[^.\s]+\.zip/);
+    return match ? match[0] : null;
+  };
+
   return (
     <div className="flex flex-col gap-1 w-full">
       {segments.map((seg, i) => {
         if (seg.type === "text") {
-          return <MarkdownMessage key={i} content={seg.content} />;
+          const downloadUrl = seg.content ? extractDownloadUrl(seg.content) : null;
+          return (
+            <div key={i}>
+              <MarkdownMessage content={seg.content || ""} />
+              {downloadUrl && (
+                <a
+                  href={downloadUrl}
+                  download
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
+                >
+                  <Download className="h-3 w-3" />
+                  Download file
+                </a>
+              )}
+            </div>
+          );
         } else {
           return <ToolBlock key={i} call={seg.call!} status={seg.status as "running" | "completed"} />;
         }
