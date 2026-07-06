@@ -89,10 +89,18 @@ export function MarkdownMessage({ content }: { content: string }) {
         components={{
           /* Code blocks */
           code({ node, className, children, ...props }: any) {
-            const isBlock = !props.inline;
             const match = /language-(\w+)/.exec(className || "");
             const language = match ? match[1] : "";
-            const code = String(children).replace(/\n$/, "");
+            const codeString = String(children);
+            const code = codeString.replace(/\n$/, "");
+
+            // In react-markdown v9, 'inline' is no longer passed. 
+            // We can determine if it's a block by checking if it has a language, 
+            // contains a newline, or spans multiple lines in the AST.
+            const isBlock = 
+              !!match || 
+              codeString.includes("\n") || 
+              (node?.position?.start?.line !== node?.position?.end?.line);
 
             if (isBlock) {
               return <CodeBlock language={language} code={code} />;
